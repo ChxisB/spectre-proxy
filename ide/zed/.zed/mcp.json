@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Spectre Proxy",
+    "url": "http://127.0.0.1:8082/v1/messages",
+    "headers": {
+      "Content-Type": "application/json",
+      "x-api-key": "spectre-proxy"
+    },
+    "description": "Spectre Proxy — multi-provider AI agent (OpenRouter, Ollama, Gemini, etc.)"
+  }
+]
