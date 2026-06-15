@@ -1,93 +1,51 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# Docker helper script for Spectre Proxy
+
+set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 
-cd "$ROOT_DIR"
-
-# ─── Cross-platform helpers ──────────────────────────────────────────
-# open_url opens a URL in the default browser on any platform.
-open_url() {
-  case "$(uname -s)" in
-    Darwin)  open "$1" ;;
-    Linux)   xdg-open "$1" ;;
-    MINGW*|MSYS*|CYGWIN*) start "$1" ;;
-    *)       echo "Open $1 in your browser" ;;
-  esac
-}
-
-# ─── Help ────────────────────────────────────────────────────────────
-usage() {
-  cat <<EOF
-Usage: ./docker/run.sh [command]
-
-Commands:
-  up        Build and start all services    (docker compose up --build -d)
-  down      Stop all services               (docker compose down)
-  logs      Follow logs                     (docker compose logs -f)
-  restart   Restart all services
-  status    Show container status
-  build     Rebuild images without starting
-  shell     Open a shell in the agent container
-  dashboard Open the dashboard in your browser
-EOF
-  exit 0
-}
-
-# ─── Config ──────────────────────────────────────────────────────────
-# Source API keys from ~/.spectre-proxy/.env if it exists
-ENV_FILE="$HOME/.spectre-proxy/.env"
-if [ -f "$ENV_FILE" ]; then
-  set -a
-  source "$ENV_FILE"
-  set +a
-fi
-
-# Default model
-export MODEL="${MODEL:-openrouter/anthropic/claude-sonnet-4}"
-
-# ─── Commands ────────────────────────────────────────────────────────
 case "${1:-help}" in
-  up)
-    echo "🚀 Building and starting Spectre Proxy..."
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" up --build -d
+  up|start)
+    echo "Starting Spectre Proxy services..."
+    docker compose -f "$COMPOSE_FILE" up -d
     echo ""
-    echo "  Dashboard:  http://localhost:3000"
-    echo "  Proxy:      http://localhost:8082"
-    echo "  Proxy API:  curl http://localhost:8082/v1/models"
-    echo ""
-    echo "  Set API keys: export OPENROUTER_API_KEY=sk-..."
-    echo "  Or add them to: $ENV_FILE"
+    echo "Services started:"
+    echo "  Dashboard: http://localhost:3000"
+    echo "  Proxy API: http://localhost:8082"
+    echo "  Health:    curl http://localhost:8082/health"
     ;;
-  down)
-    echo "🛑 Stopping Spectre Proxy..."
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" down
-    ;;
-  logs)
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" logs -f
+  down|stop)
+    echo "Stopping Spectre Proxy services..."
+    docker compose -f "$COMPOSE_FILE" down
     ;;
   restart)
-    echo "🔄 Restarting..."
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" down
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" up --build -d
+    echo "Restarting Spectre Proxy services..."
+    docker compose -f "$COMPOSE_FILE" restart
     ;;
-  status)
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" ps
+  logs)
+    docker compose -f "$COMPOSE_FILE" logs -f "${2:-}"
     ;;
   build)
-    echo "🔨 Building images..."
-    docker compose -f "$SCRIPT_DIR/docker-compose.yml" build
+    echo "Building Docker images..."
+    docker compose -f "$COMPOSE_FILE" build
     ;;
-  shell)
-    echo "🐚 Opening shell in proxy container..."
-    docker exec -it spectre-proxy sh
+  status)
+    docker compose -f "$COMPOSE_FILE" ps
     ;;
-  dashboard)
-    echo "📂 Opening dashboard..."
-    open_url "http://localhost:3000"
-    ;;
-  *)
-    usage
+  help|*)
+    echo "Spectre Proxy Docker Helper"
+    echo ""
+    echo "Usage: $0 <command>"
+    echo ""
+    echo "Commands:"
+    echo "  up|start    Start services in background"
+    echo "  down|stop   Stop all services"
+    echo "  restart     Restart all services"
+    echo "  logs [svc]  View logs (optionally for specific service)"
+    echo "  build       Build Docker images"
+    echo "  status      Show service status"
+    echo "  help        Show this help message"
     ;;
 esac

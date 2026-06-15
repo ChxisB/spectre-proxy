@@ -1,0 +1,22 @@
+# ─── Build stage ──────────────────────────────────────────────
+FROM golang:1.26-alpine AS builder
+WORKDIR /src
+
+# Copy dependency manifests first for layer caching
+COPY go.mod go.sum ./
+COPY deps/ ./deps/
+RUN go mod download
+
+# Copy the rest of the source tree
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -o /spectre-server .
+
+# ─── Production stage ─────────────────────────────────────────
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /spectre-server /usr/local/bin/spectre-server
+
+EXPOSE 8082
+
+CMD ["spectre-server", "server", "--host", "tcp://0.0.0.0:8082"]

@@ -1,72 +1,55 @@
 services:
+  # ─── Agent (Go proxy server) ────────────────────────────────
   agent:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.proxy
-    container_name: spectre-proxy
-    restart: unless-stopped
+      dockerfile: docker/Dockerfile.agent
     ports:
       - "8082:8082"
     environment:
       - HOST=0.0.0.0
       - PORT=8082
-      # API keys — set these in your shell before `docker compose up`
-      # or put them in ~/.spectre-proxy/.env (mounted below)
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MODEL=${MODEL:-claude-sonnet-4-20250514}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
-      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OPENCODE_API_KEY=${OPENCODE_API_KEY:-}
-      - CODESTRAL_API_KEY=${CODESTRAL_API_KEY:-}
-      - KIMI_API_KEY=${KIMI_API_KEY:-}
-      - WAFER_API_KEY=${WAFER_API_KEY:-}
-      - ZAI_API_KEY=${ZAI_API_KEY:-}
-      - FIREWORKS_API_KEY=${FIREWORKS_API_KEY:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - MODEL=${MODEL:-open_router/anthropic/claude-sonnet-4}
-      # MODEL is also read from ~/.spectre-proxy/.env by run.sh at startup
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     volumes:
-      # Mount config so settings persist across restarts
-      - ~/.spectre-proxy:/root/.spectre-proxy:ro
-    extra_hosts:
-      # Allow the agent to reach services running on the host machine
-      # (Ollama on localhost:11434, LM Studio on localhost:1234, etc.)
-      - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8082/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      - spectre-data:/data
+      - spectre-vault:/vault
+      - ${HOME:-~}/.spectre:/root/.spectre
+    restart: unless-stopped
 
+  # ─── Dashboard (Next.js) ────────────────────────────────────
   dashboard:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.dashboard
-    container_name: spectre-dashboard
-    restart: unless-stopped
+      context: ../dashboard
+      dockerfile: ../docker/Dockerfile.dashboard
     ports:
       - "3000:3000"
     environment:
-      - HOST=0.0.0.0
-      - PORT=3000
       - AGENT_INTERNAL_URL=http://agent:8082
       - VAULT_PATH=/vault
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
     volumes:
-      # Mount Obsidian vault for the memory graph
-      - ~/Spectre Proxy/agent-vault:/vault:ro
-      # Mount config and task data for dashboard
-      - ~/.spectre-proxy:/root/.spectre-proxy
+      - spectre-data:/data
+      - spectre-vault:/vault
+      - ${HOME:-~}/.spectre:/root/.spectre
     depends_on:
-      agent:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - agent
+    restart: unless-stopped
 
-networks:
-  default:
-    name: spectre-proxy
+volumes:
+  spectre-data:
+  spectre-vault:

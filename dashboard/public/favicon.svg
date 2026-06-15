@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Ghost body -->
+  <path d="M512 80 C276 80 80 260 80 500 L80 740 C80 770 100 790 130 790 C160 790 180 770 200 740 L220 680 C240 620 280 620 300 680 L320 740 C340 790 380 790 400 740 L420 680 C440 620 480 620 500 680 L520 740 C540 790 580 790 600 740 L620 680 C640 620 680 620 700 680 L720 740 C740 790 780 790 800 740 L820 680 C840 620 880 620 900 680 L920 740 C940 770 960 790 944 790 L944 500 C944 260 748 80 512 80 Z" fill="#8b5cf6"/>
+  <!-- Eyes -->
+  <ellipse cx="380" cy="380" rx="50" ry="70" fill="#1a1a2e"/>
+  <ellipse cx="644" cy="380" rx="50" ry="70" fill="#1a1a2e"/>
+  <!-- Eye highlights -->
+  <ellipse cx="400" cy="340" rx="15" ry="20" fill="#8b5cf6"/>
+  <ellipse cx="664" cy="340" rx="15" ry="20" fill="#8b5cf6"/>
+  <!-- Mouth -->
+  <path d="M420 500 Q512 580 604 500" fill="none" stroke="#1a1a2e" stroke-width="12" stroke-linecap="round"/>
+</svg>
