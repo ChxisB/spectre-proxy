@@ -22,12 +22,11 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
   exit 0
 fi
 
-# Run the compiled binary if available
+# Try the compiled binary first (fastest)
 if [ -f "$TALON_HOME/bin/talon-ai" ]; then
   exec "$TALON_HOME/bin/talon-ai" "$@"
 fi
 
-# Fall back to running from source
-echo "⚠️  Binary not found, starting from source..." >&2
-cd "$TALON_ROOT/ai/packages/tui"
+# Run from source (always works)
+cd "$TALON_ROOT/ai/packages/talon"
 exec bun run src/index.ts "$@"
