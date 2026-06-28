@@ -77,6 +77,13 @@ export const Info = Schema.Struct({
   small_model: Schema.optional(Schema.String).annotate({
     description: "Small model to use for tasks like title generation in the format of provider/model",
   }),
+  vision_model: Schema.optional(Schema.String).annotate({
+    description:
+      "Vision model for image/document analysis in the format of provider/model, " +
+      "eg anthropic/claude-sonnet-4. When set, user messages containing image or PDF " +
+      "attachments are first routed to this model for analysis, and the analysis text " +
+      "is injected into context before the default coding model continues.",
+  }),
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
@@ -183,7 +190,13 @@ export const Info = Schema.Struct({
         description: "Policy statements applied to supported resources, such as provider access",
       }),
     }),
-  ),
-}).annotate({ identifier: "Config" })
+    ),
+    hashline_edit: Schema.optional(
+      Schema.Literals(["strict", "best-effort", "off"])
+    ).annotate({
+      description:
+        "Hashline edit verification mode. 'strict' rejects stale edits with error recovery. 'best-effort' warns but applies. 'off' skips hashline.",
+    }),
+  }).annotate({ identifier: "Config" })
 
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>>

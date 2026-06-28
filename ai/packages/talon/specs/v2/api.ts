@@ -1,9 +1,9 @@
 // @ts-nocheck
 
-import { OpenCode } from "@talon-ai/core"
+import { Talon } from "@talon-ai/core"
 import { ReadTool } from "@talon-ai/core/tools"
 
-const talon = OpenCode.make({})
+const talon = Talon.make({})
 
 talon.tool.add(ReadTool)
 

@@ -2,16 +2,16 @@ import fs from "fs/promises"
 import path from "path"
 import { describe, expect } from "bun:test"
 import { Effect, Schema } from "effect"
-import { AbsolutePath, Location, Model, OpenCode, Session, Tool } from "@talon-ai/core/public"
+import { AbsolutePath, Location, Model, Talon, Session, Tool } from "@talon-ai/core/public"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
-const it = testEffect(OpenCode.layer)
+const it = testEffect(Talon.layer)
 
-describe("public native OpenCode API", () => {
+describe("public native Talon API", () => {
   it.effect("exposes only the intentional Session capabilities", () =>
     Effect.gen(function* () {
-      const talon = yield* OpenCode.Service
+      const talon = yield* Talon.Service
 
       expect(Object.keys(talon).sort()).toEqual(["sessions", "tools"])
 
@@ -49,7 +49,7 @@ describe("public native OpenCode API", () => {
       Effect.flatMap((tmp) =>
         Effect.gen(function* () {
           yield* writeProvider(tmp.path)
-          const talon = yield* OpenCode.Service
+          const talon = yield* Talon.Service
           const sessionID = Session.ID.make("ses_public_switch_available")
           const model = ref({ variant: "fast" })
           yield* talon.sessions.create({
@@ -74,7 +74,7 @@ describe("public native OpenCode API", () => {
         Effect.gen(function* () {
           yield* writeProvider(available.path)
           yield* writeProvider(disabled.path, true)
-          const talon = yield* OpenCode.Service
+          const talon = yield* Talon.Service
           const availableID = Session.ID.make("ses_public_switch_exact_available")
           const disabledID = Session.ID.make("ses_public_switch_exact_disabled")
           yield* talon.sessions.create({
@@ -111,7 +111,7 @@ describe("public native OpenCode API", () => {
       Effect.flatMap((tmp) =>
         Effect.gen(function* () {
           yield* writeProvider(tmp.path)
-          const talon = yield* OpenCode.Service
+          const talon = yield* Talon.Service
           const sessionID = Session.ID.make("ses_public_switch_variant")
           const selected = ref({ variant: "fast" })
           yield* talon.sessions.create({
@@ -133,7 +133,7 @@ describe("public native OpenCode API", () => {
 
   it.effect("preserves the typed not-found error for a missing Session", () =>
     Effect.gen(function* () {
-      const talon = yield* OpenCode.Service
+      const talon = yield* Talon.Service
       const sessionID = Session.ID.make("ses_public_switch_missing")
       const error = yield* talon.sessions
         .switchModel({

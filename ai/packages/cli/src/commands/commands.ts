@@ -4,7 +4,7 @@ import { Spec } from "../framework/spec"
 declare const TALON_CLI_NAME: string | undefined
 
 export const Commands = Spec.make(typeof TALON_CLI_NAME === "string" ? TALON_CLI_NAME : "talon", {
-  description: "OpenCode 2.0 preview command line interface",
+  description: "Talon 2.0 preview command line interface",
   commands: [
     Spec.make("debug", {
       description: "Debugging and troubleshooting tools",

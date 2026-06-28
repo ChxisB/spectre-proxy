@@ -78,9 +78,9 @@ Notes:
 - `make` / `makeWithDefaults` should match the Drizzle Effect SQLite branch as much as possible.
 - `DefaultServices` should provide Drizzle's default logger/cache services, same as Effect Postgres.
 - The package should depend on Effect SQL SQLite clients (`@effect/sql-sqlite-bun` and/or node) the same way the Drizzle branch does.
-- Opencode-specific path/channel selection stays in `packages/talon`.
+- Talon-specific path/channel selection stays in `packages/talon`.
 
-## Opencode Adoption Notes
+## Talon Adoption Notes
 
 These are not package requirements, but they matter for the later talon adoption PR.
 

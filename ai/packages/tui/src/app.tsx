@@ -61,6 +61,7 @@ import { KVProvider, useKV } from "./context/kv"
 import * as Model from "./util/model"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
+import path from "path"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { TuiConfigProvider, useTuiConfig, type TuiConfig } from "./config"
 import { createTuiApiAdapters } from "./plugin/adapters"
@@ -70,10 +71,10 @@ import { CommandPaletteDialog } from "./component/command-palette"
 import {
   COMMAND_PALETTE_COMMAND,
   TALON_BASE_MODE,
-  OpencodeKeymapProvider,
-  registerOpencodeKeymap,
+  TalonKeymapProvider,
+  registerTalonKeymap,
   useBindings,
-  useOpencodeKeymap,
+  useTalonKeymap,
 } from "./keymap"
 
 import type { EventSource } from "./context/sdk"
@@ -206,7 +207,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       win32DisableProcessedInput()
       const keymap = createDefaultTuiKeymap(renderer)
       yield* Effect.acquireRelease(
-        Effect.sync(() => registerOpencodeKeymap(keymap, renderer, input.config)),
+        Effect.sync(() => registerTalonKeymap(keymap, renderer, input.config)),
         (unregister) => Effect.sync(unregister),
       )
       yield* Effect.addFinalizer(() =>
@@ -271,7 +272,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                         }}
                       >
                         <ClipboardProvider>
-                          <OpencodeKeymapProvider keymap={keymap}>
+                          <TalonKeymapProvider keymap={keymap}>
                             <ArgsProvider {...input.args}>
                               <KVProvider>
                                 <ToastProvider>
@@ -327,7 +328,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                 </ToastProvider>
                               </KVProvider>
                             </ArgsProvider>
-                          </OpencodeKeymapProvider>
+                          </TalonKeymapProvider>
                         </ClipboardProvider>
                       </TuiStartupProvider>
                     </TuiTerminalEnvironmentProvider>
@@ -359,7 +360,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
   const dialog = useDialog()
   const local = useLocal()
   const kv = useKV()
-  const keymap = useOpencodeKeymap()
+  const keymap = useTalonKeymap()
   const event = useEvent()
   const sdk = useSDK()
   const toast = useToast()
@@ -525,16 +526,82 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     })
   })
 
-  createEffect(
-    on(
-      () => sync.status === "complete" && sync.data.provider.length === 0,
-      (isEmpty, wasEmpty) => {
-        // only trigger when we transition into an empty-provider state
-        if (!isEmpty || wasEmpty) return
-        dialog.replace(() => <DialogProviderList />)
-      },
-    ),
-  )
+  // Project initialization: inline prompt on first run (like legacy talon-ai)
+  const [showInitPrompt, setShowInitPrompt] = createSignal(false)
+  let initChecked = false
+  createEffect(() => {
+    if (initChecked || sync.status !== "complete") return
+    initChecked = true
+
+    const projectDir = project.instance.path().directory
+    if (!projectDir || kv.get("init_done")) return
+
+    const contextFiles = ["AGENTS.md", "CLAUDE.md", "TALON.md", "agents.md", "talon.md", "CLAUDE.local.md"]
+    void Promise.all(contextFiles.map((f) => Bun.file(path.join(projectDir, f)).exists())).then((results) => {
+      if (results.some(Boolean)) {
+        kv.set("init_done", true)
+        return
+      }
+      // Show inline prompt (not a modal) asking to initialize
+      setShowInitPrompt(true)
+    })
+  })
+
+  useBindings(() => {
+    if (!showInitPrompt()) return {}
+    return {
+      bindings: [
+        {
+          key: "y",
+          desc: "Initialize project",
+          group: "Init",
+          cmd: async () => {
+            setShowInitPrompt(false)
+            kv.set("init_done", true)
+            const projectDir = project.instance.path().directory
+            if (!projectDir) return
+            const template = `# ${path.basename(projectDir)}
+
+This file provides context about your project for Talon AI.
+
+## Tech Stack
+
+- Language/Framework:
+- Build System:
+- Key Libraries:
+
+## Conventions
+
+- Coding style:
+- Testing approach:
+`
+            await Bun.write(path.join(projectDir, "AGENTS.md"), template)
+              .then(() => {
+                toast.show({
+                  variant: "info",
+                  message: "Created AGENTS.md for project context",
+                })
+              })
+              .catch(() => {})
+          },
+        },
+        {
+          key: "n",
+          desc: "Skip initialization",
+          group: "Init",
+          cmd: () => {
+            setShowInitPrompt(false)
+            kv.set("init_done", true)
+            toast.show({
+              variant: "info",
+              message: "Run /init in a session to create AGENTS.md later",
+              duration: 5000,
+            })
+          },
+        },
+      ],
+    }
+  })
 
   const connected = useConnected()
   const currentWorktreeWorkspace = createMemo(() => {
@@ -686,7 +753,10 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.move(1)
+          // Defer to let SolidJS complete current reactive cascade before
+          // agent switch triggers new one. Direct signal writes during
+          // component swap hit disposed owner contexts (U.r crash).
+          setTimeout(() => local.agent.move(1), 0)
         },
       },
       {
@@ -720,7 +790,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         category: "Agent",
         hidden: true,
         run: () => {
-          local.agent.move(-1)
+          setTimeout(() => local.agent.move(-1), 0)
         },
       },
       {
@@ -1050,7 +1120,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
     await DialogAlert.show(
       dialog,
       "Update Complete",
-      `Successfully updated to OpenCode v${result.data.version}. Please restart the application.`,
+      `Successfully updated to Talon v${result.data.version}. Please restart the application.`,
     )
 
     void exit()
@@ -1101,6 +1171,27 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
           </Switch>
           {plugin()}
         </box>
+        <Show when={showInitPrompt()}>
+          <box
+            flexShrink={0}
+            flexDirection="row"
+            justifyContent="space-between"
+            paddingLeft={2}
+            paddingRight={2}
+            paddingTop={1}
+            paddingBottom={1}
+            backgroundColor={theme.backgroundPanel}
+          >
+            <text fg={theme.text}>
+              Would you like to initialize this project?{" "}
+              <span style={{ fg: theme.primary }}>(y/n)</span>
+            </text>
+            <text fg={theme.textMuted}>
+              y <span style={{ fg: theme.textMuted }}>yes</span>{"   "}n{" "}
+              <span style={{ fg: theme.textMuted }}>no</span>
+            </text>
+          </box>
+        </Show>
         <box flexShrink={0}>
           <pluginRuntime.Slot name="app_bottom" />
         </box>

@@ -17,6 +17,10 @@ import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { FSUtil } from "@talon-ai/core/fs-util"
+import { checkForSlop, cleanBlankLines } from "@talon-ai/core/tool/comment-checker"
+import { stripHashes } from "@talon-ai/core/hashline"
+import { extractLineRefs, verifyEditRequest, buildHashlineErrorResponse } from "@talon-ai/core/hashline-errors"
+import { Config } from "@/config/config"
 import * as Bom from "@/util/bom"
 
 function normalizeLineEndings(text: string): string {
@@ -58,10 +62,11 @@ export const Parameters = Schema.Struct({
 export const EditTool = Tool.define(
   "edit",
   Effect.gen(function* () {
-    const lsp = yield* LSP.Service
-    const afs = yield* FSUtil.Service
-    const format = yield* Format.Service
-    const events = yield* EventV2Bridge.Service
+      const lsp = yield* LSP.Service
+      const afs = yield* FSUtil.Service
+      const format = yield* Format.Service
+      const events = yield* EventV2Bridge.Service
+      const config = yield* Config.Service
 
     return {
       description: DESCRIPTION,
@@ -85,6 +90,7 @@ export const EditTool = Tool.define(
           let diff = ""
           let contentOld = ""
           let contentNew = ""
+          let slopCount = 0
           yield* lock(filePath).withPermits(1)(
             Effect.gen(function* () {
               if (params.oldString === "") {
@@ -97,7 +103,9 @@ export const EditTool = Tool.define(
                 const next = Bom.split(params.newString)
                 const desiredBom = next.bom
                 contentOld = ""
-                contentNew = next.text
+                const slop1 = checkForSlop(next.text)
+                slopCount = slop1.count
+                contentNew = cleanBlankLines(slop1.cleaned)
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                 yield* ctx.ask({
                   permission: "edit",
@@ -127,12 +135,44 @@ export const EditTool = Tool.define(
               contentOld = source.text
 
               const ending = detectLineEnding(contentOld)
-              const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
+
+                // Hashline verification: extract line refs, verify against file, apply mode
+                const refs = extractLineRefs(params.oldString)
+                const hasHashes = refs.length > 0
+                const hashlineMode: "strict" | "best-effort" | "off" =
+                  (yield* config.get()).hashline_edit ?? "best-effort"
+
+                if (hasHashes && hashlineMode !== "off") {
+                  const result = verifyEditRequest(filePath, params.oldString, contentOld)
+                  if (!result.valid) {
+                    if (hashlineMode === "strict") {
+                      const errorResponse = buildHashlineErrorResponse(
+                        filePath,
+                        result.mismatches,
+                        result.fileLines,
+                      )
+                      throw new Error(
+                        `${errorResponse.error}\n\nCorrected content for retry:\n${errorResponse.remappedContent}`,
+                      )
+                    }
+                    yield* Effect.logInfo("hashline mismatch", {
+                      mismatches: result.mismatches,
+                      filePath,
+                    })
+                  }
+                }
+
+                // Strip hashes from oldString for content matching
+                const cleanOld = hasHashes ? stripHashes(params.oldString) : params.oldString
+
+              const old = convertToLineEnding(normalizeLineEndings(cleanOld), ending)
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
               const desiredBom = source.bom || next.bom
-              contentNew = next.text
+              const slop2 = checkForSlop(next.text)
+              slopCount = slop2.count
+              contentNew = cleanBlankLines(slop2.cleaned)
 
               diff = trimDiff(
                 createTwoFilesPatch(
@@ -194,6 +234,11 @@ export const EditTool = Tool.define(
           })
 
           let output = "Edit applied successfully."
+          if (slopCount > 0) {
+            output += `\n(AI Slop Guard removed ${slopCount} boilerplate comment${slopCount > 1 ? "s" : ""})`
+          }
+          // Hashline verification mode is controlled by config hashline_edit (strict / best-effort / off)
+          // (the edit tool's fuzzy matching already handles the text-level matching)
           yield* lsp.touchFile(filePath, "document")
           const diagnostics = yield* lsp.diagnostics()
           const normalizedFilePath = FSUtil.normalizePath(filePath)

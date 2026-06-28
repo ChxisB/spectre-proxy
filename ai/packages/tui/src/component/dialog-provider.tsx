@@ -225,9 +225,9 @@ export function createDialogProviderOptions() {
   return options
 }
 
-export function DialogProvider() {
+export function DialogProvider(props?: { onBack?: () => void; backLabel?: string }) {
   const options = createDialogProviderOptions()
-  return <DialogSelect title="Connect a provider" options={options()} />
+  return <DialogSelect title="Connect a provider" options={options()} onBack={props?.onBack} backLabel={props?.backLabel} />
 }
 
 interface AutoMethodProps {
@@ -366,32 +366,17 @@ function ApiMethod(props: ApiMethodProps) {
     <DialogPrompt
       title={props.title}
       placeholder="API key"
-      description={
-        {
-          talon: (
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                key.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://talon.ai/zen</span> to get a key
-              </text>
-            </box>
-          ),
-          "talon-go": (
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
-                with generous usage limits.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://talon.ai/go</span> and enable OpenCode Go
-              </text>
-            </box>
-          ),
-        }[props.providerID] ?? undefined
-      }
+      description={() => (
+        <box gap={1}>
+          <text fg={theme.textMuted}>
+            Talon Zen gives you access to all the best coding models at the cheapest prices with a single API
+            key.
+          </text>
+          <text fg={theme.text}>
+            Go to <span style={{ fg: theme.primary }}>https://talon.ai/zen</span> to get a key
+          </text>
+        </box>
+      )}
       onConfirm={async (value) => {
         if (!value) return
         await sdk.client.auth.set({

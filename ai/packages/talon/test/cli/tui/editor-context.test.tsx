@@ -10,11 +10,11 @@ import { TestTuiContexts } from "../../fixture/tui-environment"
 import { discoverEditorConnection } from "@talon-ai/tui/editor"
 
 const originalClaudePort = process.env.CLAUDE_CODE_SSE_PORT
-const originalOpencodePort = process.env.TALON_EDITOR_SSE_PORT
+const originalTalonPort = process.env.TALON_EDITOR_SSE_PORT
 
 afterEach(() => {
   process.env.CLAUDE_CODE_SSE_PORT = originalClaudePort
-  process.env.TALON_EDITOR_SSE_PORT = originalOpencodePort
+  process.env.TALON_EDITOR_SSE_PORT = originalTalonPort
 })
 
 function nextTick() {

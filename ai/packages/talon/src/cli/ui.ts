@@ -1,6 +1,7 @@
 import { EOL } from "os"
 import { Schema } from "effect"
 import { logo as glyphs } from "./logo"
+import { renderMarkdown } from "./markdown"
 
 const wordmark = [
   `+---+---+---+---+---+`,
@@ -125,7 +126,7 @@ export function error(message: string) {
 }
 
 export function markdown(text: string): string {
-  return text
+  return renderMarkdown(text)
 }
 
 export * as UI from "./ui"

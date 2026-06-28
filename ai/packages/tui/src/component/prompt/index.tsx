@@ -51,7 +51,7 @@ import { createFadeIn } from "../../util/signal"
 import { DialogSkill } from "../dialog-skill"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
 import { useArgs } from "../../context/args"
-import { TALON_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
+import { TALON_BASE_MODE, useBindings, useCommandShortcut, useLeaderActive, useTalonKeymap } from "../../keymap"
 import { useTuiConfig } from "../../config"
 import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
@@ -105,7 +105,8 @@ function randomIndex(count: number) {
   return Math.floor(Math.random() * count)
 }
 
-function fadeColor(color: RGBA, alpha: number) {
+function fadeColor(color: RGBA | undefined, alpha: number) {
+  if (!color) return RGBA.fromValues(0, 0, 0, 1)
   return RGBA.fromValues(color.r, color.g, color.b, color.a * alpha)
 }
 
@@ -159,7 +160,7 @@ export function Prompt(props: PromptProps) {
   const status = createMemo(() => sync.data.session_status?.[props.sessionID ?? ""] ?? { type: "idle" })
   const history = usePromptHistory()
   const stash = usePromptStash()
-  const keymap = useOpencodeKeymap()
+  const keymap = useTalonKeymap()
   const agentShortcut = useCommandShortcut("agent.cycle")
   const paletteShortcut = useCommandShortcut("command.palette.show")
   const renderer = useRenderer()
@@ -207,6 +208,24 @@ export function Prompt(props: PromptProps) {
   const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
   const [cursorVersion, setCursorVersion] = createSignal(0)
   const currentProviderLabel = createMemo(() => local.model.parsed().provider)
+  const visionModelParsed = createMemo(() => {
+    const raw = (sync.data.config as Record<string, unknown>).vision_model as string | undefined
+    const value = raw ?? (kv.get("model_image") as string | undefined)
+    if (!value) return { model: "Not set", provider: undefined as string | undefined, variant: undefined }
+    const parts = value.split("/")
+    if (parts.length < 2) return { model: value, provider: parts[0], variant: undefined }
+    const providerID = parts[0]
+    const modelID = parts.slice(1).join("/")
+    const provider = sync.data.provider.find((p) => p.id === providerID)
+    const info = provider?.models[modelID]
+    const variant = local.model.variant.get(providerID, modelID)
+    const variants = local.model.variant.listFor(providerID, modelID)
+    return {
+      model: info?.name ?? modelID,
+      provider: provider?.name ?? providerID,
+      variant: variant && variants.includes(variant) ? variant : undefined,
+    }
+  })
   const hasRightContent = createMemo(() => Boolean(props.right))
 
   function promptModelWarning() {
@@ -1284,7 +1303,7 @@ export function Prompt(props: PromptProps) {
     if (store.mode === "shell") return theme.primary
     const agent = local.agent.current()
     if (!agent) return theme.border
-    return local.agent.color(agent.name)
+    return local.agent.color(agent.name) ?? theme.border
   })
 
   const showVariant = createMemo(() => {
@@ -1433,41 +1452,71 @@ export function Prompt(props: PromptProps) {
               cursorColor={props.disabled ? theme.backgroundElement : theme.text}
               syntaxStyle={syntax()}
             />
-            <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
+              <box flexDirection="column" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
               <box flexDirection="row" gap={1}>
                 <Show when={local.agent.current()} fallback={<box height={1} />}>
                   {(agent) => (
-                    <>
-                      <text fg={fadeColor(highlight(), agentMetaAlpha())}>
-                        {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
-                      </text>
-                      <Show when={store.mode === "normal"}>
-                        <box flexDirection="row" gap={1}>
-                          <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>·</text>
-                          <text
-                            flexShrink={0}
-                            fg={fadeColor(leader() ? theme.textMuted : theme.text, modelMetaAlpha())}
-                          >
-                            {local.model.parsed().model}
-                          </text>
-                          <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>{currentProviderLabel()}</text>
-                          <Show when={showVariant()}>
-                            <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>·</text>
-                            <text>
-                              <span style={{ fg: fadeColor(theme.warning, variantMetaAlpha()), bold: true }}>
-                                {local.model.variant.current()}
-                              </span>
-                            </text>
-                          </Show>
-                        </box>
-                      </Show>
-                    </>
+                    <text fg={fadeColor(highlight(), agentMetaAlpha())}>
+                      {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
+                    </text>
                   )}
                 </Show>
+                <Show when={hasRightContent()}>
+                  <box flexDirection="row" gap={1} alignItems="center">
+                    {props.right}
+                  </box>
+                </Show>
               </box>
-              <Show when={hasRightContent()}>
-                <box flexDirection="row" gap={1} alignItems="center">
-                  {props.right}
+              <Show when={store.mode === "normal"}>
+                <box flexDirection="row" gap={1} flexShrink={0}>
+                  <text fg={fadeColor(theme.textMuted, modelMetaAlpha())} selectable={false}>
+                    Coding
+                  </text>
+                  <text fg={fadeColor(theme.textMuted, modelMetaAlpha())} selectable={false}>
+                    ·
+                  </text>
+                  <text
+                    flexShrink={0}
+                    fg={fadeColor(leader() ? theme.textMuted : theme.text, modelMetaAlpha())}
+                  >
+                    {local.model.parsed().model}
+                  </text>
+                  <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>{currentProviderLabel()}</text>
+                  <Show when={showVariant()}>
+                    <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>·</text>
+                    <text>
+                      <span style={{ fg: fadeColor(theme.warning, variantMetaAlpha()), bold: true }}>
+                        {local.model.variant.current()}
+                      </span>
+                    </text>
+                  </Show>
+                </box>
+                <box flexDirection="row" gap={1} flexShrink={0}>
+                  <text fg={fadeColor(theme.textMuted, modelMetaAlpha())} selectable={false}>
+                    Vision
+                  </text>
+                  <text fg={fadeColor(theme.textMuted, modelMetaAlpha())} selectable={false}>
+                    ·
+                  </text>
+                  <text
+                    flexShrink={0}
+                    fg={fadeColor(leader() ? theme.textMuted : theme.text, modelMetaAlpha())}
+                  >
+                    {visionModelParsed().model}
+                  </text>
+                  <Show when={visionModelParsed().provider}>
+                    <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>
+                      {visionModelParsed().provider}
+                    </text>
+                  </Show>
+                  <Show when={visionModelParsed().variant}>
+                    <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>·</text>
+                    <text>
+                      <span style={{ fg: fadeColor(theme.warning, variantMetaAlpha()), bold: true }}>
+                        {visionModelParsed().variant}
+                      </span>
+                    </text>
+                  </Show>
                 </box>
               </Show>
             </box>
@@ -1514,6 +1563,7 @@ export function Prompt(props: PromptProps) {
                       <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                     </Show>
                   </box>
+                  {/* Status label intentionally not shown here — it belongs in the session chat thinking area */}
                   <box flexDirection="row" gap={1} flexShrink={0}>
                     {(() => {
                       const retry = createMemo(() => {

@@ -801,6 +801,15 @@ export const layer = Layer.effect(
               field: "text",
               delta: value.text,
             })
+            yield* plugin.trigger("message.stream.delta", {
+              sessionID: ctx.sessionID,
+              messageID: ctx.currentText.messageID,
+              partID: ctx.currentText.id,
+              type: "text",
+              delta: value.text,
+            }, {}).pipe(
+              Effect.catch((error) => Effect.logWarning("message.stream.delta hook failed", { error })),
+            )
             return
 
           case "text-end":
@@ -966,6 +975,8 @@ export const layer = Layer.effect(
         ctx.shouldBreak = (yield* config.get()).experimental?.continue_loop_on_deny !== true
 
         return yield* Effect.gen(function* () {
+          const requestStart = Date.now()
+
           yield* Effect.gen(function* () {
             ctx.currentText = undefined
             ctx.currentTextID = undefined
@@ -1025,6 +1036,22 @@ export const layer = Layer.effect(
             ),
             Effect.catch(halt),
             Effect.ensuring(cleanup()),
+          )
+
+          const requestDuration = Date.now() - requestStart
+          const requestError = ctx.assistantMessage.error
+            ? typeof ctx.assistantMessage.error === "string"
+              ? ctx.assistantMessage.error
+              : (ctx.assistantMessage.error as any)?.message ?? String(ctx.assistantMessage.error)
+            : undefined
+          yield* plugin.trigger("provider.request.after", {
+            sessionID: ctx.sessionID,
+            providerID: input.model.providerID,
+            modelID: input.model.id,
+            duration: requestDuration,
+            error: requestError,
+          }, {}).pipe(
+            Effect.catch((error) => Effect.logWarning("provider.request.after hook failed", { error })),
           )
 
           if (ctx.needsCompaction) return "compact"

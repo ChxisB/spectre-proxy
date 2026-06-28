@@ -83,7 +83,7 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString stdenv.hostPlatform.isDarwin ''
       mkdir -p $out/Applications
       mv dist/mac*/*.app $out/Applications
-      makeWrapper "$out/Applications/Talon.app/Contents/MacOS/OpenCode" $out/bin/talon-desktop
+      makeWrapper "$out/Applications/Talon.app/Contents/MacOS/Talon" $out/bin/talon-desktop
     ''
     + lib.optionalString stdenv.hostPlatform.isLinux ''
       mkdir -p $out/opt/talon-desktop

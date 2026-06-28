@@ -1,4 +1,4 @@
-import { createOpencodeClient } from "@talon-ai/sdk/v2"
+import { createTalonClient } from "@talon-ai/sdk/v2"
 import type { GlobalEvent } from "@talon-ai/sdk/v2"
 import { Flag } from "@talon-ai/core/flag/flag"
 import { createSimpleContext } from "./helper"
@@ -21,7 +21,7 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     let sse: AbortController | undefined
 
     function createSDK() {
-      return createOpencodeClient({
+      return createTalonClient({
         baseUrl: props.url,
         signal: abort.signal,
         directory: props.directory,

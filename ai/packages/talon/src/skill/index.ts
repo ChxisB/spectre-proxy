@@ -32,13 +32,23 @@ const SKILL_PATTERN = "**/SKILL.md"
 const CUSTOMIZE_TALON_SKILL_NAME = "customize-talon"
 const CUSTOMIZE_TALON_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating talon's own configuration: talon.json, talon.jsonc, files under .talon/, or files under ~/.config/talon/. Also use when creating or fixing talon agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring talon itself."
-const CUSTOMIZE_TALON_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
+const CUSTOMIZE_TALON_SKILL_BODY = SkillPlugin.CustomizeTalonContent
 
 export const Info = Schema.Struct({
-  name: Schema.String,
-  description: Schema.optional(Schema.String),
-  location: Schema.String,
-  content: Schema.String,
+    name: Schema.String,
+    description: Schema.optional(Schema.String),
+    model: Schema.optional(Schema.String),
+    agent: Schema.optional(Schema.String),
+    subtask: Schema.optional(Schema.Boolean),
+    "argument-hint": Schema.optional(Schema.String),
+    license: Schema.optional(Schema.String),
+    compatibility: Schema.optional(Schema.String),
+    metadata: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+    "allowed-tools": Schema.optional(Schema.Array(Schema.String)),
+    mcp_servers: Schema.optional(Schema.Array(Schema.Unknown)),
+    mcp: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+    location: Schema.String,
+    content: Schema.String,
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -130,13 +140,24 @@ const add = Effect.fnUntraced(function* (state: State, match: string, events: Ev
     })
   }
 
-  state.dirs.add(path.dirname(match))
-  state.skills[md.data.name] = {
-    name: md.data.name,
-    description: md.data.description,
-    location: match,
-    content: md.content,
-  }
+    const data = md.data as Record<string, unknown>
+    state.dirs.add(path.dirname(match))
+    state.skills[md.data.name] = {
+      name: md.data.name,
+      description: md.data.description,
+      model: typeof data.model === "string" ? data.model : undefined,
+      agent: typeof data.agent === "string" ? data.agent : undefined,
+      subtask: typeof data.subtask === "boolean" ? data.subtask : undefined,
+      "argument-hint": typeof data["argument-hint"] === "string" ? data["argument-hint"] : undefined,
+      license: typeof data.license === "string" ? data.license : undefined,
+      compatibility: typeof data.compatibility === "string" ? data.compatibility : undefined,
+      metadata: typeof data.metadata === "object" && data.metadata !== null ? (data.metadata as Record<string, string>) : undefined,
+      "allowed-tools": Array.isArray(data["allowed-tools"]) ? (data["allowed-tools"] as string[]) : undefined,
+      mcp_servers: Array.isArray(data.mcp_servers) ? (data.mcp_servers as unknown[]) : undefined,
+      mcp: typeof data.mcp === "object" && data.mcp !== null ? (data.mcp as Record<string, unknown>) : undefined,
+      location: match,
+      content: md.content,
+    }
 })
 
 const scan = Effect.fnUntraced(function* (

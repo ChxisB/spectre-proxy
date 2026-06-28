@@ -10,7 +10,7 @@ import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
 
-import { type Tool as AITool, tool, jsonSchema } from "ai"
+import { type Tool as AITool, tool, jsonSchema, type ModelMessage } from "ai"
 import type { JSONSchema7 } from "@ai-sdk/provider"
 import { SessionCompaction } from "./compaction"
 import { SystemPrompt } from "./system"
@@ -38,6 +38,10 @@ import { LLM } from "./llm"
 import { Shell } from "@talon-ai/core/shell"
 import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@talon-ai/core/fs-util"
+import { classifyIntent } from "@talon-ai/core/session/intent"
+import { analyze as intentGate } from "./intent-gate"
+import { buildRepoMap, formatRepoMap } from "@talon-ai/core/repomap"
+
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
@@ -58,8 +62,12 @@ import * as DateTime from "effect/DateTime"
 import { eq } from "drizzle-orm"
 import { SessionTable } from "@talon-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
+import { isUltraworkMode, resolveUltraworkVariant, enableUltraworkMode } from "./modes"
+import * as SessionLoop from "./loop"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@talon-ai/llm"
+import { MediaRouter } from "./media-router"
+import { categoryToModelType, resolveVisionModel } from "@talon-ai/core/category"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -244,12 +252,22 @@ export const layer = Layer.effect(
       session: Session.Info
       msgs: SessionV1.WithParts[]
     }) {
-      const { task, model, lastUser, sessionID, session, msgs } = input
-      const ctx = yield* InstanceState.context
-      const promptOps = yield* ops()
-      const { task: taskTool } = yield* registry.named()
-      const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
-      const assistantMessage: SessionV1.Assistant = yield* sessions.updateMessage({
+        const { task, model, lastUser, sessionID, session, msgs } = input
+        const ctx = yield* InstanceState.context
+        const promptOps = yield* ops()
+        const { task: taskTool } = yield* registry.named()
+        const taskModel = task.model ? yield* getModel(task.model.providerID, task.model.modelID, sessionID) : model
+
+        yield* plugin.trigger("subagent.started", {
+          sessionID,
+          parentSessionID: sessionID,
+          agent: task.agent,
+          task: task.prompt,
+        }, {}).pipe(
+          Effect.catch((error) => Effect.logWarning("subagent.started hook failed", { error })),
+        )
+
+        const assistantMessage: SessionV1.Assistant = yield* sessions.updateMessage({
         id: MessageID.ascending(),
         role: "assistant",
         parentID: lastUser.id,
@@ -658,9 +676,23 @@ export const layer = Layer.effect(
               .getModel(model.providerID, model.modelID)
               .pipe(Effect.catchIf(Provider.ModelNotFoundError.isInstance, () => Effect.succeed(undefined)))
           : undefined
-      const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
+        const variant = input.variant ?? (ag.variant && full?.variants?.[ag.variant] ? ag.variant : undefined)
 
-      const info: SessionV1.User = {
+        const text = input.parts.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("\n")
+        yield* plugin.trigger("chat.message.before", {
+          sessionID: input.sessionID,
+          agent: agentName,
+          text,
+          parts: input.parts,
+        }, {
+          parts: input.parts,
+          system: input.system,
+          tools: input.tools,
+        }).pipe(
+          Effect.catch((error) => Effect.logWarning("chat.message.before hook failed", { error })),
+        )
+
+        const info: SessionV1.User = {
         id: input.messageID ?? MessageID.ascending(),
         role: "user",
         sessionID: input.sessionID,
@@ -1131,12 +1163,118 @@ export const layer = Layer.effect(
       throw new Error("Impossible")
     })
 
-    const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
+    const runLoop = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
+        let modelOverride: { providerID: string; modelID: string } | undefined
+
+        // ── Vision Pre-Analysis ──────────────────────────────────────────────
+        // If the first user message has image/PDF attachments and a vision model
+        // is configured, route media to the vision model for description before
+        // the coding model processes the request. The analysis text is injected
+        // into the context as a synthetic assistant message via finalModelMsgs.
+        //
+        // NOTE: visionAnalysisAttempted tracks whether we even found a vision model
+        // and media to analyze — even if the actual analysis fails, we must still
+        // strip media from the primary model messages (line 1452) since the primary
+        // model cannot handle raw image input. If analysis succeeds, the text is
+        // also injected as context (line 1459).
+        let visionAnalysisText: string | undefined
+        let visionAnalysisAttempted = false
+        {
+          const initialMsgs = yield* MessageV2.filterCompactedEffect(sessionID).pipe(
+            Effect.provideService(Database.Service, database),
+          )
+          const { user: firstUser } = MessageV2.latest(initialMsgs)
+          if (firstUser) {
+            const firstAgent = yield* agents.get(firstUser.agent).pipe(Effect.option)
+            if (Option.isSome(firstAgent)) {
+              const cfg = yield* config.get()
+              let visionModelStr = firstAgent.value.options?.vision_model ?? cfg.vision_model
+
+              // If no explicit vision_model is configured, try the user's selected model
+              // if it has vision capabilities (so the vision model follows the CLI model selector)
+              if (!visionModelStr && firstUser.model) {
+                const userModel = yield* provider.getModel(
+                  firstUser.model.providerID,
+                  firstUser.model.modelID,
+                ).pipe(Effect.option)
+                if (Option.isSome(userModel) && userModel.value.capabilities?.input?.image) {
+                  visionModelStr = `${firstUser.model.providerID}/${firstUser.model.modelID}`
+                  yield* Effect.logInfo("using selected model as vision model", {
+                    "session.id": sessionID,
+                    model: visionModelStr,
+                  })
+                }
+              }
+
+              const parsedVision = MediaRouter.parseModelString(visionModelStr as string | undefined)
+              const firstParts =
+                initialMsgs.find((m) => m.info.role === "user" && m.info.id === firstUser.id)?.parts ?? []
+              if (parsedVision && MediaRouter.hasMediaAttachments(firstParts)) {
+                visionAnalysisAttempted = true
+                const visionModel = yield* getModel(parsedVision.providerID, parsedVision.modelID, sessionID)
+                yield* status.set(sessionID, {
+                  type: "busy",
+                  label: `Analyzing image with ${visionModel.name}...`,
+                })
+                const textParts = firstParts
+                  .filter((p): p is SessionV1.TextPart => p.type === "text")
+                  .map((p) => p.text)
+                const result = yield* MediaRouter.analyzeAttachments(
+                  firstParts, textParts, visionModel, sessionID,
+                  firstAgent.value, firstUser, llm.stream.bind(llm),
+                ).pipe(
+                  // The vision analysis uses Effect.orDie internally (llmStream).
+                  // If the LLM call fails (defect), log and continue gracefully.
+                  Effect.catchCause((cause) =>
+                    Effect.gen(function* () {
+                      if (Cause.hasDies(cause)) {
+                        yield* Effect.logWarning("vision analysis failed (defect)", {
+                          "session.id": sessionID,
+                          model: visionModel.id,
+                          error: String(Cause.squash(cause)),
+                        })
+                      } else {
+                        yield* Effect.logWarning("vision analysis failed", {
+                          "session.id": sessionID,
+                          model: visionModel.id,
+                          error: Cause.pretty(cause),
+                        })
+                      }
+                      return { analysis: "", analyzed: false } as const
+                    }),
+                  ),
+                )
+                if (result.analyzed) {
+                  visionAnalysisText = result.analysis
+                  yield* Effect.logInfo("vision analysis complete", {
+                    "session.id": sessionID,
+                    model: visionModel.id,
+                    length: visionAnalysisText.length,
+                  })
+                  yield* status.set(sessionID, {
+                    type: "busy",
+                    label: "Vision analysis complete, handing to primary model...",
+                  })
+                } else {
+                  yield* Effect.logWarning("vision analysis returned empty result", {
+                    "session.id": sessionID,
+                    model: visionModel.id,
+                  })
+                  yield* status.set(sessionID, {
+                    type: "busy",
+                    label: "Vision analysis returned no content, continuing...",
+                  })
+                }
+              }
+            }
+          }
+        }
+        // ── End Vision Pre-Analysis ──────────────────────────────────────────
 
         while (true) {
           yield* status.set(sessionID, { type: "busy" })
@@ -1191,13 +1329,57 @@ export const layer = Layer.effect(
               history: msgs,
             }).pipe(Effect.ignore, Effect.forkIn(scope))
 
-          const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          // ── Category-Based Model Routing (Step 1 only) ──────────────────
+          // If IntentGate detected a category that maps to the Vision model,
+          // override the model selection for this session loop.
+          if (step === 1) {
+            const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+            const userText = lastUserMsg?.parts
+              .filter((p): p is SessionV1.TextPart => p.type === "text")
+              .map((p) => p.text)
+              .join(" ") ?? ""
+            if (userText.length > 0) {
+              const classified = classifyIntent(userText)
+              const gateResult = intentGate(userText, classified.intent)
+              if (gateResult.category && gateResult.confidence > 0.7) {
+                const cfg = yield* config.get()
+                const modelType = categoryToModelType(gateResult.category)
+                if (modelType === "vision") {
+                  const visionModel = resolveVisionModel(cfg)
+                  if (visionModel) {
+                    modelOverride = visionModel
+                  }
+                }
+                yield* Effect.logInfo("category routing decision", {
+                  category: gateResult.category,
+                  modelType,
+                  fromModel: `${lastUser.model.providerID}/${lastUser.model.modelID}`,
+                  toModel: modelOverride ? `${modelOverride.providerID}/${modelOverride.modelID}` : "unchanged",
+                  reason: modelType === "vision" ? "visual-engineering/artistry category" : "non-visual category",
+                })
+              }
+            }
+          }
+
+          const model = yield* getModel(
+            modelOverride ? ProviderV2.ID.make(modelOverride.providerID) : lastUser.model.providerID,
+            modelOverride ? ModelV2.ID.make(modelOverride.modelID) : lastUser.model.modelID,
+            sessionID,
+          )
           const task = tasks.pop()
 
-          if (task?.type === "subtask") {
-            yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
-            continue
-          }
+            if (task?.type === "subtask") {
+              yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+              yield* plugin.trigger("subagent.ended", {
+                sessionID,
+                parentSessionID: sessionID,
+                agent: task.agent,
+                task: task.prompt,
+              }, {}).pipe(
+                Effect.catch((error) => Effect.logWarning("subagent.ended hook failed", { error })),
+              )
+              continue
+            }
 
           if (task?.type === "compaction") {
             const result = yield* compaction.process({
@@ -1310,9 +1492,135 @@ export const layer = Layer.effect(
               sys.skills(agent),
               sys.environment(model),
               instruction.system().pipe(Effect.orDie),
-              MessageV2.toModelMessagesEffect(msgs, model),
+              MessageV2.toModelMessagesEffect(msgs, model, visionAnalysisAttempted && step === 1 ? { stripMedia: true } : undefined),
             ])
-            const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+
+            // ── Inject vision analysis into model messages ──────────────────
+            // If a vision pre-analysis was performed AND returned actual text,
+            // insert the analysis as a synthetic assistant message + follow-up
+            // user message so the coding model has the analysis in context.
+            const finalModelMsgs: ModelMessage[] = visionAnalysisText && step === 1
+              ? [
+                  ...modelMsgs,
+                  { role: "assistant", content: `[Media analysis by ${model.id}]:\n${visionAnalysisText}` },
+                  { role: "user", content: "Continue with the above media analysis in mind." },
+                ]
+              : modelMsgs
+            // ── Intent Classification ──────────────────────────────────
+            // On the first step, classify the user's intent and inject a
+            // context-appropriate system prompt hint.
+              let intentHint: string | undefined
+              let categoryHint: string | undefined
+              if (step === 1) {
+                const userText = lastUserMsg?.parts
+                  .filter((p): p is SessionV1.TextPart => p.type === "text")
+                  .map((p) => p.text)
+                  .join(" ") ?? ""
+              if (userText.length > 0) {
+                  const classified = classifyIntent(userText)
+                  intentHint = classified.systemHint
+                  const gateResult = intentGate(userText, classified.intent)
+                  if (gateResult.category && gateResult.confidence > 0.7) {
+                    categoryHint = gateResult.category
+                    if (gateResult.systemHint) intentHint = gateResult.systemHint
+                  }
+                  yield* Effect.logInfo("intent classification", {
+                    "session.id": sessionID,
+                    intent: classified.intent,
+                    confidence: classified.confidence.toFixed(2),
+                    category: gateResult.category,
+                    suggestedAgent: classified.suggestedAgent,
+                    matches: classified.matches.join(", "),
+                  })
+              }
+
+              // ── Ultrawork Mode Detection ────────────────────────────
+              // Scan the first user message for ultrawork/ulw keyword and
+              // activate ultrawork mode + Ralph Loop if found.
+              if (/\b(ultrawork|ulw)\b/i.test(userText)) {
+                const variant = resolveUltraworkVariant(model.id)
+                enableUltraworkMode(variant, sessionID)
+
+                // Start the Ralph Loop for persistent continuation
+                // Extract the goal from the user's message (remove the ultrawork keyword)
+                const goal = userText.replace(/\b(ultrawork|ulw)\b/gi, "").trim()
+                SessionLoop.startLoop(goal || userText, sessionID)
+
+                yield* Effect.logInfo("ultrawork mode activated with Ralph Loop", {
+                  "session.id": sessionID,
+                  variant,
+                  loopRunId: SessionLoop.getActiveRun()?.id,
+                })
+              }
+            }
+            // ── Repo Map ──────────────────────────────────────────────
+            // On the first step, build a ranked map of the workspace and
+            // inject it into the system prompt for codebase-aware context.
+            let repoMapBlock: string | undefined
+            if (step === 1) {
+              try {
+                const repoMap = buildRepoMap({ directory: ctx.directory })
+                if (repoMap.ranked.length > 0) {
+                  repoMapBlock = formatRepoMap(repoMap)
+                  yield* Effect.logInfo("repo-map built", {
+                    "session.id": sessionID,
+                    files: repoMap.totalFiles,
+                    ranked: repoMap.ranked.length,
+                    symbols: repoMap.totalSymbols,
+                  })
+                }
+              } catch (e) {
+                yield* Effect.logWarning("repo-map failed", { "session.id": sessionID, error: String(e) })
+              }
+            }
+
+            // ── Project Context ───────────────────────────────────────
+            // Load context files from .talon/context/ and .talon/context/
+            // (coding standards, patterns, workflows from TalonAgentsControl).
+            // Uses synchronous file reads to avoid Effect service requirements.
+            let contextBlock: string | undefined
+            if (step === 1) {
+              try {
+                const { loadContextFiles, formatContextBlock } = yield* Effect.promise(() =>
+                  import("@talon-ai/core/config/context")
+                )
+                const fs = require("fs") as typeof import("fs")
+                const path = require("path") as typeof import("path")
+                const syncFs = {
+                  readdirSync: (d: string) => { try { return fs.readdirSync(d) } catch { return [] } },
+                  readFileSync: (p: string, e: string) => { try { return fs.readFileSync(p, e as BufferEncoding) as string } catch { return "" } },
+                  statSync: (p: string) => { try { const s = fs.statSync(p); return { isDirectory: () => s.isDirectory() } } catch { return { isDirectory: () => false } } },
+                }
+                const files: import("@talon-ai/core/config/context").ContextFile[] = []
+                const dirs = [
+                  path.join(ctx.directory, ".talon", "context"),
+                ]
+                for (const dir of dirs) {
+                  files.push(...loadContextFiles(dir, syncFs))
+                }
+                contextBlock = formatContextBlock(files)
+                if (contextBlock) {
+                  yield* Effect.logInfo("project context loaded", {
+                    "session.id": sessionID,
+                    size: contextBlock.length,
+                  })
+                }
+              } catch (e) {
+                yield* Effect.logWarning("project context load failed", { "session.id": sessionID, error: String(e) })
+              }
+            }
+
+            const system = [
+              ...env,
+              ...instructions,
+              ...(intentHint ? [`[Intent: ${intentHint}]`] : []),
+              ...(categoryHint ? [`[Category: ${categoryHint}]`] : []),
+              ...(isUltraworkMode() ? [`<system-reminder>ULTRAWORK MODE ACTIVE - Maximum precision required. Delegate, verify, and deliver 100%.</system-reminder>`] : []),
+              ...(repoMapBlock ? [repoMapBlock] : []),
+              ...(contextBlock ? [contextBlock] : []),
+              ...(skills ? [skills] : []),
+              ...(step === 1 ? [SystemPrompt.evidenceModeBlock()].filter((x): x is string => x !== undefined) : []),
+            ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1322,7 +1630,7 @@ export const layer = Layer.effect(
               sessionID,
               parentSessionID: session.parentID,
               system,
-              messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
+              messages: [...finalModelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
               tools,
               model,
               toolChoice: format.type === "json_schema" ? "required" : undefined,

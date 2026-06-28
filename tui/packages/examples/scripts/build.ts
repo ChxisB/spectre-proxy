@@ -179,8 +179,8 @@ for (const { platform: targetPlatform, arch: targetArch } of buildTargets) {
       },
       entrypoints: [join(examplesDir, "index.ts")],
       define: {
-        OPENCODE_VERSION: `'${version}'`,
-        OPENCODE_CHANNEL: `'dev'`,
+        TALON_VERSION: `'${version}'`,
+        TALON_CHANNEL: `'dev'`,
       },
     })
 

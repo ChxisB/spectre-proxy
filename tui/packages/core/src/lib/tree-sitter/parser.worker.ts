@@ -829,9 +829,12 @@ class ParserWorker {
       return
     }
 
-    // Markdown Parser BUG: For markdown, ensure content ends with newline so closing delimiters are parsed correctly
-    // The tree-sitter markdown parser only creates closing delimiter nodes when followed by newline
-    const parseContent = filetype === "markdown" && content.endsWith("```") ? content + "\n" : content
+    // Markdown Parser BUG: The tree-sitter markdown parser only creates closing delimiter
+    // nodes when followed by newline. Without a trailing newline, inline formatting like
+    // **bold**, `code`, _emphasis_, and code fences all fail to parse correctly.
+    // Adding a trailing newline for all markdown content ensures the parser properly
+    // identifies all closing delimiters and produces correct syntax highlights.
+    const parseContent = filetype === "markdown" ? content + "\n" : content
 
     const tree = reusableState.parser.parse(parseContent)
 
@@ -864,7 +867,21 @@ class ParserWorker {
         injectionRanges = injectionResult.injectionRanges
       }
 
-      const highlights = this.getSimpleHighlights(matches, injectionRanges)
+      let highlights = this.getSimpleHighlights(matches, injectionRanges)
+
+      // Clamp highlight positions to original content length (before trailing \n was added
+      // for tree-sitter markdown parsing). Without this, the +1 offset from the trailing
+      // newline causes out-of-bounds slices in treeSitterToTextChunks.
+      if (filetype === "markdown" && highlights.length > 0) {
+        highlights = highlights.map((h) => {
+          const [start, end, name, meta] = h
+          const clampedEnd = Math.min(end, content.length)
+          if (clampedEnd <= start) return null // skip zero-width highlights from clamping
+          return (meta !== undefined
+            ? [start, clampedEnd, name, meta]
+            : [start, clampedEnd, name]) as SimpleHighlight
+        }).filter(Boolean) as SimpleHighlight[]
+      }
 
       postWorkerMessage({
         type: "ONESHOT_HIGHLIGHT_RESPONSE",

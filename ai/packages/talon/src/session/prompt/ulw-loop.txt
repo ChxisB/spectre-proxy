@@ -1,0 +1,22 @@
+<system-reminder>
+ULW LOOP CONTINUATION — You are NOT done yet.
+
+The following tasks are still incomplete from your previous turn:
+
+${incompleteTasks}
+
+Your goal is:
+${goal}
+
+You have been continuing this work for ${continuationCount} turns. If you are stuck, try a different approach:
+- Break the remaining work into smaller steps
+- Delegate to subagents via the task tool
+- Use explore agents to find relevant patterns
+- Ask the user for clarification if truly stuck
+
+Continue working. Do NOT stop until ALL tasks are completed and verified.
+Do NOT repeat work that is already done.
+Do NOT change scope without user approval.
+
+${evidenceLog}
+</system-reminder>

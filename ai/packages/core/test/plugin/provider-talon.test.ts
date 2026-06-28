@@ -7,7 +7,7 @@ import { Integration } from "@talon-ai/core/integration"
 import { Location } from "@talon-ai/core/location"
 import { ModelV2 } from "@talon-ai/core/model"
 import { PluginV2 } from "@talon-ai/core/plugin"
-import { OpencodePlugin } from "@talon-ai/core/plugin/provider/talon"
+import { TalonPlugin } from "@talon-ai/core/plugin/provider/talon"
 import { ProviderV2 } from "@talon-ai/core/provider"
 import { AbsolutePath } from "@talon-ai/core/schema"
 import { location } from "../fixture/location"
@@ -20,11 +20,11 @@ const locationLayer = Layer.succeed(
 )
 
 const pluginWithIntegrations = (integrations: Integration.Interface) => ({
-  ...OpencodePlugin,
-  effect: OpencodePlugin.effect.pipe(Effect.provideService(Integration.Service, integrations)),
+  ...TalonPlugin,
+  effect: TalonPlugin.effect.pipe(Effect.provideService(Integration.Service, integrations)),
 })
 
-describe("OpencodePlugin", () => {
+describe("TalonPlugin", () => {
   it.effect("uses a public key and disables paid models without credentials", () =>
     withEnv({ TALON_API_KEY: undefined }, () =>
       Effect.gen(function* () {

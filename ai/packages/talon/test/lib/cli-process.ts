@@ -16,7 +16,7 @@
 // Today only `talon.run` is fully wired. The shape supports adding more
 // builders (`talon.serve(opts)`, `talon.acp(opts)`, `talon.auth(...)`)
 // without changing the fixture. Long-lived commands like `serve` will need a
-// different return shape — see the TODO at the bottom of OpencodeCli.
+// different return shape — see the TODO at the bottom of TalonCli.
 import { test, type TestOptions } from "bun:test"
 import { FSUtil } from "@talon-ai/core/fs-util"
 import { AppProcess } from "@talon-ai/core/process"
@@ -144,7 +144,7 @@ export type AcpHandle = {
   readonly exited: Promise<number>
 }
 
-export type OpencodeCli = {
+export type TalonCli = {
   // High-level: run a single prompt against the test model. Short-lived.
   readonly run: (message: string, opts?: RunOpts) => Effect.Effect<RunResult>
   // Spawn `talon serve` and wait until it's listening. Long-lived: the
@@ -170,7 +170,7 @@ export type OpencodeCli = {
 export type CliFixture = {
   readonly llm: TestLLMServer["Service"]
   readonly home: string
-  readonly talon: OpencodeCli
+  readonly talon: TalonCli
 }
 
 // Provisions a TestLLMServer + tmpdir + spawn helper and invokes fn. Cleans
@@ -401,7 +401,7 @@ export function withCliFixture<A, E>(
       } satisfies AcpHandle
     })
 
-    const talon: OpencodeCli = { run, serve, acp, spawn, expectExit, parseJsonEvents }
+    const talon: TalonCli = { run, serve, acp, spawn, expectExit, parseJsonEvents }
 
     return yield* fn({ llm, home, talon })
     // FetchHttpClient is provided so test bodies can `yield* HttpClient.HttpClient`

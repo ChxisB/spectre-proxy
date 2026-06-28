@@ -392,25 +392,32 @@ export class CodeRenderable extends TextBufferRenderable {
         const styledText = new StyledText(chunks)
         this.textBuffer.setStyledText(styledText)
         this.setRenderedLineSources(renderedLineSources)
-      } else {
-        this.textBuffer.setText(content)
-        this.setRenderedLineSources(undefined)
-      }
+        } else if (this._initialStyledText) {
+          this.textBuffer.setStyledText(this._initialStyledText)
+          this.setRenderedLineSources(undefined)
+        } else {
+          this.textBuffer.setText(content)
+          this.setRenderedLineSources(undefined)
+        }
 
-      this._shouldRenderTextBuffer = true
-      this._isHighlighting = false
-      this._highlightsDirty = false
-      this.updateTextInfo()
-      this.requestRender()
-    } catch (error) {
-      if (snapshotId !== this._highlightSnapshotId) {
+        this._shouldRenderTextBuffer = true
+        this._isHighlighting = false
+        this._highlightsDirty = false
+        this.updateTextInfo()
         this.requestRender()
-        return
-      }
+      } catch (error) {
+        if (snapshotId !== this._highlightSnapshotId) {
+          this.requestRender()
+          return
+        }
 
-      console.warn("Code highlighting failed, falling back to plain text:", error)
-      if (this.isDestroyed) return
-      this.textBuffer.setText(content)
+        console.warn("Code highlighting failed, falling back to plain text:", error)
+        if (this.isDestroyed) return
+        if (this._initialStyledText) {
+          this.textBuffer.setStyledText(this._initialStyledText)
+        } else {
+          this.textBuffer.setText(content)
+        }
       this.setRenderedLineSources(undefined)
       this._shouldRenderTextBuffer = true
       this._isHighlighting = false

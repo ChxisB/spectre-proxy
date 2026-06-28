@@ -499,7 +499,7 @@ name: talon-skill
 description: A skill in the .talon/skill directory.
 ---
 
-# OpenCode Skill
+# Talon Skill
 `,
               ),
             ]),
@@ -546,7 +546,7 @@ name: talon-skill
 description: A skill in the .talon/skill directory.
 ---
 
-# OpenCode Skill
+# Talon Skill
 `,
               ),
               Bun.write(
@@ -556,7 +556,7 @@ name: talon-skill
 description: A skill in the .talon/skills directory.
 ---
 
-# OpenCode Skill
+# Talon Skill
 `,
               ),
             ]),

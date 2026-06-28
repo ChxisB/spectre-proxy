@@ -1,0 +1,28 @@
+Multi-agent workflow execution. Decomposes a complex task into parallel and sequential steps, each handled by a specialized agent.
+
+Use this when a task is too large for one agent, or has distinct phases that benefit from different expertise.
+
+Example workflow:
+```json
+{
+  "name": "Add dark mode",
+  "description": "Add dark mode support to the app",
+  "steps": [
+    { "name": "audit", "agent": "librarian", "task": "Find all color references in the codebase" },
+    { "name": "design", "agent": "architect", "task": "Design the dark mode architecture", "dependsOn": ["audit"] },
+    { "name": "implement", "agent": "build", "task": "Implement dark mode following the design", "dependsOn": ["design"] },
+    { "name": "review", "agent": "reviewer", "task": "Review dark mode implementation", "dependsOn": ["implement"] }
+  ]
+}
+```
+
+Available specialist agents:
+- **explore**: Fast file search and pattern matching
+- **librarian**: Deep codebase investigation and dependency tracing
+- **architect**: Software architecture and design guidance
+- **reviewer**: Code review for bugs, security, and quality
+- **planner**: Task decomposition and strategic planning
+- **general**: General-purpose multi-step tasks
+- **build**: Default agent (code editing and implementation)
+
+Steps with no "dependsOn" run in parallel. Steps with "dependsOn" run after their dependencies complete. Context flows automatically from upstream steps.

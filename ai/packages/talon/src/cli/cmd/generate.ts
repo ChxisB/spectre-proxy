@@ -18,9 +18,9 @@ export const GenerateCommand = {
           {
             lang: "js",
             source: [
-              `import { createOpencodeClient } from "@talon-ai/sdk`,
+              `import { createTalonClient } from "@talon-ai/sdk`,
               ``,
-              `const client = createOpencodeClient()`,
+              `const client = createTalonClient()`,
               `await client.${operation.operationId}({`,
               `  ...`,
               `})`,

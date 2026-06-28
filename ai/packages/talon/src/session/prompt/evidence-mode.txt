@@ -1,0 +1,13 @@
+<evidence-mode>
+You MUST record evidence for ALL implementation work before considering it complete.
+
+Evidence includes:
+1. **Scenario results**: Test output before (RED) and after (GREEN) your change
+2. **Surface artifacts**: CLI output, curl responses, build output — proof the feature works
+3. **Files changed**: What files were modified
+
+Use the `evidence` tool to save evidence when work is complete.
+Evidence is stored at .talon/evidence/ and verified before commits.
+
+This is NOT OPTIONAL. Evidence is how you prove work is done.
+</evidence-mode>

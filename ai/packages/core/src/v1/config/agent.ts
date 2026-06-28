@@ -12,6 +12,11 @@ const Color = Schema.Union([
 const AgentSchema = Schema.StructWithRest(
   Schema.Struct({
     model: Schema.optional(Schema.String),
+    vision_model: Schema.optional(Schema.String).annotate({
+      description:
+        "Vision model for image/document analysis in the format of provider/model, " +
+        "eg anthropic/claude-sonnet-4. Overrides the global vision_model for this agent.",
+    }),
     variant: Schema.optional(Schema.String).annotate({
       description: "Default model variant for this agent (applies only when using the agent's configured model).",
     }),
@@ -43,6 +48,7 @@ const AgentSchema = Schema.StructWithRest(
 const KNOWN_KEYS = new Set([
   "name",
   "model",
+  "vision_model",
   "variant",
   "prompt",
   "description",

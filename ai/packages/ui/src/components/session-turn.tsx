@@ -421,6 +421,16 @@ export function SessionTurn(
               <Show when={showThinking()}>
                 <div data-slot="session-turn-thinking">
                   <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} />
+                  <Show when={status().type === "busy" && (status() as { type: "busy"; label?: string }).label}>
+                    <div data-slot="session-turn-thinking-label">
+                      <TextReveal
+                        text={(status() as { type: "busy"; label?: string }).label!}
+                        class="session-turn-thinking-heading"
+                        travel={25}
+                        duration={700}
+                      />
+                    </div>
+                  </Show>
                   <Show when={!showReasoningSummaries()}>
                     <TextReveal
                       text={reasoningHeading()}

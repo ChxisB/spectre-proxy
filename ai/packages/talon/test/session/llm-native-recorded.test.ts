@@ -161,7 +161,7 @@ const RECORDED_SCENARIOS = [
   },
   {
     id: "talon-proxy",
-    name: "OpenCode proxy",
+    name: "Talon proxy",
     providerID: ProviderV2.ID.talon,
     modelID: "gpt-5.2-codex",
     cassette: "session/native-zen-tool-loop",
@@ -171,7 +171,7 @@ const RECORDED_SCENARIOS = [
     config: (model) =>
       providerConfig({
         providerID: ProviderV2.ID.talon,
-        name: "OpenCode Zen",
+        name: "Talon Zen",
         env: ["TALON_CONSOLE_TOKEN"],
         npm: "@ai-sdk/openai-compatible",
         api: zenURL(process.env.TALON_RECORD_ZEN_CONNECTION ?? "fixture"),
@@ -427,7 +427,7 @@ describe("session.llm native recorded", () => {
       test.skip(`${scenario.name}: drives a tool loop to a final text answer`, () => {})
       continue
     }
-    const it = testEffect(recordedNativeLLMLayer(scenario))
+    const it = testEffect(recordedNativeLLMLayer(scenario) as any)
     it.instance(`${scenario.name}: drives a tool loop to a final text answer`, () => driveToolLoop(scenario))
   }
 })

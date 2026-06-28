@@ -47,20 +47,58 @@ export const Source = Schema.Union([DirectorySource, UrlSource, EmbeddedSource])
 export type Source = typeof Source.Type
 
 export class Info extends Schema.Class<Info>("SkillV2.Info")({
-  name: Schema.String,
-  description: Schema.String.pipe(Schema.optional),
-  slash: Schema.Boolean.pipe(Schema.optional),
-  location: AbsolutePath,
-  content: Schema.String,
+    name: Schema.String,
+    description: Schema.String.pipe(Schema.optional),
+    slash: Schema.Boolean.pipe(Schema.optional),
+    model: Schema.String.pipe(Schema.optional),
+    agent: Schema.String.pipe(Schema.optional),
+    subtask: Schema.Boolean.pipe(Schema.optional),
+    "argument-hint": Schema.String.pipe(Schema.optional),
+    license: Schema.String.pipe(Schema.optional),
+    compatibility: Schema.String.pipe(Schema.optional),
+    metadata: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional),
+    "allowed-tools": Schema.Array(Schema.String).pipe(Schema.optional),
+    mcp_servers: Schema.Array(
+        Schema.Struct({
+            name: Schema.String,
+            type: Schema.Literals(["stdio", "remote"]),
+            command: Schema.optional(Schema.String),
+            args: Schema.optional(Schema.Array(Schema.String)),
+            env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+            url: Schema.optional(Schema.String),
+            enabled: Schema.optional(Schema.Boolean),
+        }),
+    ).pipe(Schema.optional),
+    location: AbsolutePath,
+    content: Schema.String,
 }) {}
 
 export const available = (skills: ReadonlyArray<Info>, agent: AgentV2.Info) =>
   skills.filter((skill) => PermissionV2.evaluate("skill", skill.name, agent.permissions).effect !== "deny")
 
 const Frontmatter = Schema.Struct({
-  name: Schema.String.pipe(Schema.optional),
-  description: Schema.String.pipe(Schema.optional),
-  slash: Schema.Boolean.pipe(Schema.optional),
+    name: Schema.String.pipe(Schema.optional),
+    description: Schema.String.pipe(Schema.optional),
+    slash: Schema.Boolean.pipe(Schema.optional),
+    model: Schema.String.pipe(Schema.optional),
+    agent: Schema.String.pipe(Schema.optional),
+    subtask: Schema.Boolean.pipe(Schema.optional),
+    "argument-hint": Schema.String.pipe(Schema.optional),
+    license: Schema.String.pipe(Schema.optional),
+    compatibility: Schema.String.pipe(Schema.optional),
+    metadata: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional),
+    "allowed-tools": Schema.Array(Schema.String).pipe(Schema.optional),
+    mcp_servers: Schema.Array(
+        Schema.Struct({
+            name: Schema.String,
+            type: Schema.Literals(["stdio", "remote"]),
+            command: Schema.optional(Schema.String),
+            args: Schema.optional(Schema.Array(Schema.String)),
+            env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+            url: Schema.optional(Schema.String),
+            enabled: Schema.optional(Schema.Boolean),
+        }),
+    ).pipe(Schema.optional),
 })
 const decodeFrontmatter = Schema.decodeUnknownOption(Frontmatter)
 

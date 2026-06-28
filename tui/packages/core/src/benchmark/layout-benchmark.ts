@@ -141,7 +141,7 @@ interface BenchmarkSinkState {
   checksum: number
 }
 
-interface OpencodeLayoutTreeState {
+interface TalonLayoutTreeState {
   root: BoxRenderable
   header: BoxRenderable
   body: BoxRenderable
@@ -754,9 +754,9 @@ function createScenarios(): BenchmarkScenario[] {
   return [
     {
       name: "static_talon_full_render",
-      description: "No Yoga dirties: full render pass over an OpenCode-like layout tree for update/render baseline",
+      description: "No Yoga dirties: full render pass over an Talon-like layout tree for update/render baseline",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(48, ctx.height + 12),
           includeVisualBoxes: true,
           includeText: true,
@@ -795,7 +795,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "talon_leaf_width_calculate_only",
       description: "Dirty one deep leaf width and run only root.calculateLayout()",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(64, ctx.height + 24),
           includeVisualBoxes: false,
           includeText: false,
@@ -843,7 +843,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "talon_leaf_width_full_render",
       description: "Dirty one deep leaf width and run the full renderer until layout is clean",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(64, ctx.height + 24),
           includeVisualBoxes: true,
           includeText: false,
@@ -889,7 +889,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "talon_many_rows_full_render",
       description: "Dirty a stripe of row heights and badge widths before a full settled render",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(72, ctx.height * 2),
           includeVisualBoxes: true,
           includeText: false,
@@ -946,7 +946,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "top_branch_container_full_render",
       description: "Dirty high-level header/body/sidebar/main layout props before a full settled render",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(56, ctx.height + 16),
           includeVisualBoxes: true,
           includeText: false,
@@ -1013,7 +1013,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "root_layout_size_full_render",
       description: "Dirty the RootRenderable Yoga size so percentage-based descendants recalculate from the top",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(56, ctx.height + 16),
           includeVisualBoxes: true,
           includeText: false,
@@ -1062,7 +1062,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "talon_many_rows_layout_update_only",
       description: "Dirty many rows, calculate Yoga, then only run updateLayout/render-command collection",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(72, ctx.height * 2),
           includeVisualBoxes: false,
           includeText: false,
@@ -1120,7 +1120,7 @@ function createScenarios(): BenchmarkScenario[] {
       name: "batched_leaf_props_full_render",
       description: "Dirty 128 mixed leaf and row props before one full settled render",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(96, ctx.height * 3),
           includeVisualBoxes: true,
           includeText: false,
@@ -1542,10 +1542,10 @@ function createScenarios(): BenchmarkScenario[] {
   ]
 }
 
-async function buildOpencodeLayoutTree(
+async function buildTalonLayoutTree(
   ctx: BenchmarkContext,
   options: { messageCount: number; includeVisualBoxes: boolean; includeText: boolean },
-): Promise<OpencodeLayoutTreeState> {
+): Promise<TalonLayoutTreeState> {
   clearRoot(ctx.renderer)
   resetBuffers(ctx.renderer)
 

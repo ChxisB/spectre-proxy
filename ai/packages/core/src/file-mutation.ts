@@ -67,7 +67,7 @@ export class Service extends Context.Service<Service, Interface>()("@talon/v2/Fi
 
 /**
  * Serialize file changes by canonical target. Conditional writes compare and
- * write under the same process-local lock so cooperating OpenCode mutations do
+ * write under the same process-local lock so cooperating Talon mutations do
  * not overwrite changes made from the same stale content.
  */
 export const layer = Layer.effect(

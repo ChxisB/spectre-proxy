@@ -66,7 +66,7 @@ export const InstanceHttpApi = HttpApi.make("talon-instance")
   .addHttpApi(WorkspaceApi)
   .middleware(SchemaErrorMiddleware)
 
-export const OpenCodeHttpApi = HttpApi.make("talon")
+export const TalonHttpApi = HttpApi.make("talon")
   .addHttpApi(RootHttpApi)
   .addHttpApi(EventApi)
   .addHttpApi(InstanceHttpApi)

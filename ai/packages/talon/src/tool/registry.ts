@@ -20,7 +20,7 @@ import * as Tool from "./tool"
 import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@talon-ai/plugin"
 import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
-import { Schema } from "effect"
+import { Effect, Layer, Context, Schema } from "effect"
 import z from "zod"
 import { Plugin } from "../plugin"
 import { Provider } from "@/provider/provider"
@@ -29,10 +29,29 @@ import { WebSearchTool } from "./websearch"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
+import { PolicyGenTool } from "./policygen"
+import { DiagramTool } from "./diagram"
+import { WorkflowTool } from "./workflow"
+import { ValidateTool } from "./validate"
+import { AstGrepSearchTool, AstGrepRewriteTool } from "./ast-grep"
+import { InteractiveBashTool } from "./interactive-bash"
+import {
+  TeamCreateTool,
+  TeamDeleteTool,
+  TeamShutdownRequestTool,
+  TeamApproveShutdownTool,
+  TeamRejectShutdownTool,
+  TeamSendMessageTool,
+  TeamTaskCreateTool,
+  TeamTaskListTool,
+  TeamTaskUpdateTool,
+  TeamTaskGetTool,
+  TeamStatusTool,
+  TeamListTool,
+} from "./team"
 import { Glob } from "@talon-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@talon-ai/core/cross-spawn-spawner"
@@ -105,7 +124,27 @@ export const layer = Layer.effect(
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const policygen = yield* PolicyGenTool
+    const diagram = yield* DiagramTool
+    const workflow = yield* WorkflowTool
+    const validate = yield* ValidateTool
     const agent = yield* Agent.Service
+
+    const teamCreate = yield* TeamCreateTool
+    const teamDelete = yield* TeamDeleteTool
+    const teamShutdownRequest = yield* TeamShutdownRequestTool
+    const teamApproveShutdown = yield* TeamApproveShutdownTool
+    const teamRejectShutdown = yield* TeamRejectShutdownTool
+    const teamSendMessage = yield* TeamSendMessageTool
+    const teamTaskCreate = yield* TeamTaskCreateTool
+    const teamTaskList = yield* TeamTaskListTool
+    const teamTaskUpdate = yield* TeamTaskUpdateTool
+    const teamTaskGet = yield* TeamTaskGetTool
+    const teamStatus = yield* TeamStatusTool
+    const teamList = yield* TeamListTool
+    const astGrepSearch = yield* AstGrepSearchTool
+    const astGrepRewrite = yield* AstGrepRewriteTool
+    const interactiveBash = yield* InteractiveBashTool
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -212,7 +251,29 @@ export const layer = Layer.effect(
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          policygen: Tool.init(policygen),
+          diagram: Tool.init(diagram),
+          workflow: Tool.init(workflow),
+          validate: Tool.init(validate),
+          teamCreate: Tool.init(teamCreate),
+          teamDelete: Tool.init(teamDelete),
+          teamShutdownRequest: Tool.init(teamShutdownRequest),
+          teamApproveShutdown: Tool.init(teamApproveShutdown),
+          teamRejectShutdown: Tool.init(teamRejectShutdown),
+          teamSendMessage: Tool.init(teamSendMessage),
+          teamTaskCreate: Tool.init(teamTaskCreate),
+          teamTaskList: Tool.init(teamTaskList),
+          teamTaskUpdate: Tool.init(teamTaskUpdate),
+          teamTaskGet: Tool.init(teamTaskGet),
+          teamStatus: Tool.init(teamStatus),
+          teamList: Tool.init(teamList),
+          astGrepSearch: Tool.init(astGrepSearch),
+          astGrepRewrite: Tool.init(astGrepRewrite),
+          interactiveBash: Tool.init(interactiveBash),
         })
+
+        const cfg = yield* config.get()
+        const teamEnabled = cfg.team?.enabled ?? false
 
         return {
           custom,
@@ -226,6 +287,8 @@ export const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
+            tool.workflow,
+            tool.validate,
             tool.fetch,
             tool.todo,
             tool.search,
@@ -233,6 +296,25 @@ export const layer = Layer.effect(
             tool.patch,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+            tool.policygen,
+            tool.diagram,
+            ...(teamEnabled ? [
+              tool.teamCreate,
+              tool.teamDelete,
+              tool.teamShutdownRequest,
+              tool.teamApproveShutdown,
+              tool.teamRejectShutdown,
+              tool.teamSendMessage,
+              tool.teamTaskCreate,
+              tool.teamTaskList,
+              tool.teamTaskUpdate,
+              tool.teamTaskGet,
+              tool.teamStatus,
+              tool.teamList,
+            ] : []),
+          tool.astGrepSearch,
+          tool.astGrepRewrite,
+          ...(!!process.env.TMUX ? [tool.interactiveBash] : []),
           ],
           task: tool.task,
           read: tool.read,
@@ -287,6 +369,18 @@ export const layer = Layer.effect(
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+            try {
+              yield* plugin.trigger("tool.definition.transform", {
+                toolID: tool.id,
+                tool,
+                sessionID: "",
+              }, {
+                description: output.description,
+                parameters: output.parameters,
+              })
+            } catch (error) {
+              yield* Effect.logWarning("tool.definition.transform hook failed", { error: String(error) })
+            }
           const jsonSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema

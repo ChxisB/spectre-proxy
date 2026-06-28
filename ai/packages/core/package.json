@@ -18,7 +18,14 @@
   "exports": {
     "./public": "./src/public/index.ts",
     "./session/runner": "./src/session/runner/index.ts",
+    "./session/intent": "./src/session/intent.ts",
     "./system-context": "./src/system-context/index.ts",
+    "./repomap": "./src/repomap/index.ts",
+    "./hashline": "./src/hashline.ts",
+    "./config/context": "./src/config/context.ts",
+    "./tool/comment-checker": "./src/tool/comment-checker.ts",
+    "./loop": "./src/loop/index.ts",
+    "./plugin/skill-mcp": "./src/plugin/skill-mcp.ts",
     "./*": "./src/*.ts"
   },
   "imports": {

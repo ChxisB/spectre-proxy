@@ -1,0 +1,6 @@
+Create and query accumulated wisdom from previous work sessions.
+- "save": Record a learning/insight for future sessions
+- "query": Find wisdom matching specific tags or text
+- "list": List recent wisdom entries
+
+Use this to avoid repeating past mistakes and leverage past learnings.

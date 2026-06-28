@@ -1,6 +1,8 @@
 Interact with Language Server Protocol (LSP) servers to get code intelligence features.
 
 Supported operations:
+- status: List active LSP servers and their connection status. No file path required.
+- diagnostics: Get errors, warnings, and hints for a source file. Use this to proactively check for issues in a file you just edited.
 - goToDefinition: Find where a symbol is defined
 - findReferences: Find all references to a symbol
 - hover: Get hover information (documentation, type info) for a symbol
@@ -10,15 +12,19 @@ Supported operations:
 - prepareCallHierarchy: Get call hierarchy item at a position (functions/methods)
 - incomingCalls: Find all functions/methods that call the function at a position
 - outgoingCalls: Find all functions/methods called by the function at a position
+- prepareRename: Check whether a symbol at a position can be renamed
+- rename: Rename a symbol across the workspace. Applies changes to all affected files. Requires newName parameter.
 
-All operations require:
-- filePath: The file to operate on
-- line: The line number (1-based, as shown in editors)
-- character: The character offset (1-based, as shown in editors)
+All operations require filePath except status. Navigation operations (goToDefinition, findReferences, hover, etc.) also require line and character. For diagnostics and workspaceSymbol, line and character are not needed.
+
+diagnostics also accepts:
+- severity: Filter results to "error", "warning", "information", "hint", or "all" (default).
 
 workspaceSymbol also accepts:
 - query: A query string to filter symbols by. Empty string requests all symbols.
 
-For workspaceSymbol, filePath is not sent in the LSP workspace/symbol request. It is used by talon to select and start the matching LSP server.
+rename requires:
+- newName: The new name for the symbol.
+- line, character: Position of the symbol to rename.
 
 Note: LSP servers must be configured for the file type. If no server is available, an error will be returned.

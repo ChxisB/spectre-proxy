@@ -13,7 +13,7 @@ import { CliRenderEvents, createCliRenderer, type CliRenderer, type ScrollbackWr
 import { createDefaultTuiKeymap } from "@tui/keymap/tui"
 import { Global } from "@talon-ai/core/global"
 import { openEditor } from "@talon-ai/tui/editor"
-import { registerOpencodeKeymap } from "@talon-ai/tui/keymap"
+import { registerTalonKeymap } from "@talon-ai/tui/keymap"
 import { Session as SessionApi } from "@/session/session"
 import * as Locale from "@/util/locale"
 import { resolveInteractiveStdin } from "./runtime.stdin"
@@ -196,7 +196,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
     const theme = await resolveRunTheme(renderer)
     renderer.setBackgroundColor(theme.background)
     const keymap = createDefaultTuiKeymap(renderer)
-    unregisterKeymap = registerOpencodeKeymap(keymap, renderer, input.tuiConfig)
+    unregisterKeymap = registerTalonKeymap(keymap, renderer, input.tuiConfig)
     const state: SplashState = {
       entry: false,
       exit: false,

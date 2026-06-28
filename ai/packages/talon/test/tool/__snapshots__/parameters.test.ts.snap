@@ -159,7 +159,7 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
     "character": {
-      "description": "The character offset (1-based, as shown in editors)",
+      "description": "The character offset (1-based, as shown in editors). Required for navigation operations.",
       "maximum": 9007199254740991,
       "minimum": 1,
       "type": "integer",
@@ -169,14 +169,20 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
       "type": "string",
     },
     "line": {
-      "description": "The line number (1-based, as shown in editors)",
+      "description": "The line number (1-based, as shown in editors). Required for navigation operations.",
       "maximum": 9007199254740991,
       "minimum": 1,
       "type": "integer",
     },
+    "newName": {
+      "description": "The new name for the symbol. Required for rename operation.",
+      "type": "string",
+    },
     "operation": {
       "description": "The LSP operation to perform",
       "enum": [
+        "status",
+        "diagnostics",
         "goToDefinition",
         "findReferences",
         "hover",
@@ -186,6 +192,8 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
         "prepareCallHierarchy",
         "incomingCalls",
         "outgoingCalls",
+        "prepareRename",
+        "rename",
       ],
       "type": "string",
     },
@@ -193,12 +201,21 @@ exports[`tool parameters JSON Schema (wire shape) lsp 1`] = `
       "description": "Search query for workspaceSymbol. Empty string requests all symbols.",
       "type": "string",
     },
+    "severity": {
+      "description": "Filter diagnostics by severity. Defaults to all.",
+      "enum": [
+        "error",
+        "warning",
+        "information",
+        "hint",
+        "all",
+      ],
+      "type": "string",
+    },
   },
   "required": [
     "operation",
     "filePath",
-    "line",
-    "character",
   ],
   "type": "object",
 }

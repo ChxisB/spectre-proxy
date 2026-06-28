@@ -9,7 +9,13 @@ import * as fuzzysort from "fuzzysort"
 import { useConnected } from "./use-connected"
 import { useSync } from "../context/sync"
 
-export function DialogModel(props: { providerID?: string }) {
+export function DialogModel(props: {
+  providerID?: string
+  onModelSelect?: (providerID: string, modelID: string) => void
+  onBack?: () => void
+  backLabel?: string
+  current?: { providerID: string; modelID: string } | undefined
+}) {
   const local = useLocal()
   const sync = useSync()
   const dialog = useDialog()
@@ -137,13 +143,38 @@ export function DialogModel(props: { providerID?: string }) {
   })
 
   function onSelect(providerID: string, modelID: string) {
-    local.model.set({ providerID, modelID }, { recent: true })
-    const list = local.model.variant.list()
-    const cur = local.model.variant.selected()
-    if (cur === "default" || (cur && list.includes(cur))) {
-      dialog.clear()
+    if (props.onModelSelect) {
+      props.onModelSelect(providerID, modelID)
+      const provider = sync.data.provider.find((p) => p.id === providerID)
+      const info = provider?.models[modelID]
+      const variants = info?.variants ? Object.keys(info.variants) : []
+      if (variants.length > 0) {
+        const current = local.model.variant.get(providerID, modelID)
+        dialog.replace(() => (
+          <DialogSelect<string>
+            options={[
+              { value: "default", title: "Default", onSelect: () => dialog.clear() },
+              ...variants.map((v) => ({
+                value: v,
+                title: v,
+                onSelect: () => {
+                  local.model.variant.setFor(providerID, modelID, v)
+                  dialog.clear()
+                },
+              })),
+            ]}
+            title={"Select variant"}
+            current={current}
+            flat={true}
+          />
+        ))
+      } else {
+        dialog.clear()
+      }
       return
     }
+    local.model.set({ providerID, modelID }, { recent: true })
+    const list = local.model.variant.list()
     if (list.length > 0) {
       dialog.replace(() => <DialogVariant />)
       return
@@ -175,7 +206,9 @@ export function DialogModel(props: { providerID?: string }) {
       flat={true}
       skipFilter={true}
       title={title()}
-      current={local.model.current()}
+      current={props.current ?? local.model.current()}
+      onBack={props.onBack}
+      backLabel={props.backLabel}
     />
   )
 }

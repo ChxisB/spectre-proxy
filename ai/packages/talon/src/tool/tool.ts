@@ -8,7 +8,7 @@ import type { SessionID, MessageID } from "../session/schema"
 import * as Truncate from "./truncate"
 import { Agent } from "@/agent/agent"
 
-interface Metadata {
+export interface Metadata {
   [key: string]: any
 }
 

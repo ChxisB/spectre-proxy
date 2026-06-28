@@ -1,6 +1,6 @@
 import type {
   Event,
-  createOpencodeClient,
+  createTalonClient,
   Project,
   Model,
   Provider,
@@ -54,7 +54,7 @@ export type WorkspaceAdapter = {
 }
 
 export type PluginInput = {
-  client: ReturnType<typeof createOpencodeClient>
+  client: ReturnType<typeof createTalonClient>
   project: Project
   directory: string
   worktree: string
@@ -331,5 +331,55 @@ export interface Hooks {
   /**
    * Modify tool definitions (description and parameters) sent to LLM
    */
-  "tool.definition"?: (input: { toolID: string }, output: { description: string; parameters: any }) => Promise<void>
+    "tool.definition"?: (input: { toolID: string }, output: { description: string; parameters: any }) => Promise<void>
+
+    "chat.message.before"?: (
+      input: { sessionID: string; agent?: string; text: string; parts: any[] },
+      output: { parts: any[]; system?: string[]; tools?: Record<string, boolean> },
+    ) => Promise<void>
+
+    "session.created"?: (
+      input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string }; directory?: string },
+      output: {},
+    ) => Promise<void>
+
+    "session.ended"?: (
+      input: { sessionID: string; reason?: string },
+      output: {},
+    ) => Promise<void>
+
+    "subagent.started"?: (
+      input: { sessionID: string; parentSessionID: string; agent: string; task: string },
+      output: {},
+    ) => Promise<void>
+
+    "subagent.ended"?: (
+      input: { sessionID: string; parentSessionID: string; agent: string; task: string; error?: string },
+      output: {},
+    ) => Promise<void>
+
+    "compaction.after"?: (
+      input: { sessionID: string; result: "continue" | "stop" | "error"; messagesBefore?: number; messagesAfter?: number },
+      output: {},
+    ) => Promise<void>
+
+    "provider.request.before"?: (
+      input: { sessionID: string; providerID: string; modelID: string; request: { system?: string; messages: any[]; tools?: any } },
+      output: { options?: Record<string, any> },
+    ) => Promise<void>
+
+    "provider.request.after"?: (
+      input: { sessionID: string; providerID: string; modelID: string; duration: number; error?: string },
+      output: {},
+    ) => Promise<void>
+
+    "message.stream.delta"?: (
+      input: { sessionID: string; messageID: string; partID: string; type: "text" | "reasoning" | "tool"; delta: string },
+      output: {},
+    ) => Promise<void>
+
+    "tool.definition.transform"?: (
+      input: { toolID: string; tool: any; sessionID: string },
+      output: { description?: string; parameters?: any },
+    ) => Promise<void>
 }

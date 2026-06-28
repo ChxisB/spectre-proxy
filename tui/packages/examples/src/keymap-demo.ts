@@ -116,7 +116,7 @@ const LOGO_TILE_STEPS = 16
 const LOGO_TILE_DECAY_MS = 280
 const LOGO_TILE_BASE_OPACITY = 0.42
 const LOGO_TILE_HIT_OPACITY = 0.86
-const OPENCODE_LOGO = {
+const TALON_LOGO = {
   left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
   right: ["             ▄     ", "█▀▀▀ █▀▀█ █▀▀█ █▀▀█", "█___ █__█ █__█ █^^^", "▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"],
 } as const
@@ -332,8 +332,8 @@ function isLogoLit(char: string): boolean {
 
 function getLogoLine(index: number): LogoCell[] {
   const cells: LogoCell[] = []
-  const left = OPENCODE_LOGO.left[index] ?? ""
-  const right = OPENCODE_LOGO.right[index] ?? ""
+  const left = TALON_LOGO.left[index] ?? ""
+  const right = TALON_LOGO.right[index] ?? ""
 
   for (const [x, char] of Array.from(left).entries()) {
     cells.push({ x, y: index, char, strong: false })
@@ -348,7 +348,7 @@ function getLogoLine(index: number): LogoCell[] {
 
 function getLogoCells(): LogoCell[] {
   const cells: LogoCell[] = []
-  for (let index = 0; index < OPENCODE_LOGO.left.length; index += 1) {
+  for (let index = 0; index < TALON_LOGO.left.length; index += 1) {
     cells.push(...getLogoLine(index))
   }
 
@@ -596,11 +596,11 @@ function resetLogoAnimationBpm(renderer: CliRenderer): void {
   setStatus(renderer, `Logo rhythm reset to ${logoAnimationBpm} BPM`)
 }
 
-function buildOpencodeLogoContent(): StyledText {
+function buildTalonLogoContent(): StyledText {
   const lines: TextChunk[][] = []
   const shadow = P.borderStrong
 
-  for (let index = 0; index < OPENCODE_LOGO.left.length; index += 1) {
+  for (let index = 0; index < TALON_LOGO.left.length; index += 1) {
     const chunks: TextChunk[] = []
     for (const cell of getLogoLine(index)) {
       if (cell.char === " ") {
@@ -1383,7 +1383,7 @@ function renderLogoOverlay(): void {
   }
 
   if (logoOverlayLogoText) {
-    logoOverlayLogoText.content = buildOpencodeLogoContent()
+    logoOverlayLogoText.content = buildTalonLogoContent()
   }
 
   if (logoOverlayHintText) {
@@ -2727,8 +2727,8 @@ export function run(renderer: CliRenderer): void {
 
   logoOverlayLogoText = new TextRenderable(renderer, {
     id: "keymap-demo-logo-overlay-logo",
-    content: buildOpencodeLogoContent(),
-    height: OPENCODE_LOGO.left.length,
+    content: buildTalonLogoContent(),
+    height: TALON_LOGO.left.length,
     width: 40,
   })
   logoCard.add(logoOverlayLogoText)

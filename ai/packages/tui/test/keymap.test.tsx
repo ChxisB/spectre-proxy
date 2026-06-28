@@ -5,7 +5,7 @@ import { testRender, useRenderer } from "@tui/solid"
 import { expect, test } from "bun:test"
 import { onCleanup } from "solid-js"
 import { TuiKeybind } from "../src/config/keybind"
-import { getOpencodeModeStack, TALON_BASE_MODE, OpencodeKeymapProvider, registerOpencodeKeymap } from "../src/keymap"
+import { getTalonModeStack, TALON_BASE_MODE, TalonKeymapProvider, registerTalonKeymap } from "../src/keymap"
 
 function createResolvedKeymapConfig(input: TuiKeybind.KeybindOverrides = {}) {
   const keybinds = TuiKeybind.parse(input)
@@ -28,7 +28,7 @@ test("legacy page key aliases compile as page keys", async () => {
       messages_page_up: "pgup",
       messages_page_down: "pgdown",
     })
-    const offKeymap = registerOpencodeKeymap(keymap, renderer, config)
+    const offKeymap = registerTalonKeymap(keymap, renderer, config)
     const offLayer = keymap.registerLayer({
       bindings: config.keybinds.gather("session", ["session.page.up", "session.page.down"]),
     })
@@ -46,9 +46,9 @@ test("legacy page key aliases compile as page keys", async () => {
     })
 
     return (
-      <OpencodeKeymapProvider keymap={keymap}>
+      <TalonKeymapProvider keymap={keymap}>
         <box />
-      </OpencodeKeymapProvider>
+      </TalonKeymapProvider>
     )
   }
 
@@ -70,7 +70,7 @@ test("mode-less bindings stay active when talon mode changes", async () => {
     const renderer = useRenderer()
     const keymap = createDefaultTuiKeymap(renderer)
     const config = createResolvedKeymapConfig()
-    const offKeymap = registerOpencodeKeymap(keymap, renderer, config)
+    const offKeymap = registerTalonKeymap(keymap, renderer, config)
     const offGlobal = keymap.registerLayer({
       commands: [
         { name: "session.list", run() {} },
@@ -102,10 +102,10 @@ test("mode-less bindings stay active when talon mode changes", async () => {
       )
 
     counts.base = activeCounts()
-    const popQuestion = getOpencodeModeStack(keymap).push("question")
+    const popQuestion = getTalonModeStack(keymap).push("question")
     counts.question = activeCounts()
     popQuestion()
-    const popAutocomplete = getOpencodeModeStack(keymap).push("autocomplete")
+    const popAutocomplete = getTalonModeStack(keymap).push("autocomplete")
     counts.autocomplete = activeCounts()
     popAutocomplete()
 
@@ -116,9 +116,9 @@ test("mode-less bindings stay active when talon mode changes", async () => {
     })
 
     return (
-      <OpencodeKeymapProvider keymap={keymap}>
+      <TalonKeymapProvider keymap={keymap}>
         <box />
-      </OpencodeKeymapProvider>
+      </TalonKeymapProvider>
     )
   }
 

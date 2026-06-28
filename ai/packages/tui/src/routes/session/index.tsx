@@ -79,7 +79,7 @@ import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
 import { DialogRetryAction } from "../../component/dialog-retry-action"
 import { getRevertDiffFiles } from "../../util/revert-diff"
-import { TALON_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
+import { TALON_BASE_MODE, useBindings, useCommandShortcut, useTalonKeymap } from "../../keymap"
 import { PathFormatterProvider, usePathFormatter } from "../../context/path-format"
 
 addDefaultParsers(parsers.parsers)
@@ -345,7 +345,7 @@ export function Session() {
     seeded = true
     r.set(route.prompt)
   }
-  const keymap = useOpencodeKeymap()
+  const keymap = useTalonKeymap()
   const dialog = useDialog()
   const renderer = useRenderer()
 
@@ -1253,25 +1253,43 @@ export function Session() {
                       <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
                         <></>
                       </Match>
-                      <Match when={message.role === "user"}>
-                        <UserMessage
-                          index={index()}
-                          onMouseUp={() => {
-                            if (renderer.getSelection()?.getSelectedText()) return
-                            dialog.replace(() => (
-                              <DialogMessage
-                                messageID={message.id}
-                                sessionID={route.sessionID}
-                                setPrompt={(promptInfo) => prompt?.set(promptInfo)}
-                              />
-                            ))
-                          }}
-                          message={message as UserMessage}
-                          parts={sync.data.part[message.id] ?? []}
-                          pending={pending()}
-                        />
-                      </Match>
-                      <Match when={message.role === "assistant"}>
+                        <Match when={message.role === "user"}>
+                          <UserMessage
+                            index={index()}
+                            onMouseUp={() => {
+                              if (renderer.getSelection()?.getSelectedText()) return
+                              dialog.replace(() => (
+                                <DialogMessage
+                                  messageID={message.id}
+                                  sessionID={route.sessionID}
+                                  setPrompt={(promptInfo) => prompt?.set(promptInfo)}
+                                />
+                              ))
+                            }}
+                            message={message as UserMessage}
+                            parts={sync.data.part[message.id] ?? []}
+                            pending={pending()}
+                          />
+                            <Show when={
+                              (sync.data.part[message.id] ?? []).some(
+                                (p) => p.type === "file" && (p as any).mime?.startsWith("image/"),
+                              ) &&
+                              (() => {
+                                const s = sync.data.session_status?.[route.sessionID]
+                                return s?.type === "busy" && !!(s as any)?.label
+                              })()
+                            }>
+                              <box paddingLeft={3} marginTop={1} flexDirection="row" gap={1}>
+                                <Spinner color={theme.textMuted}>
+                                  {(() => {
+                                    const s = sync.data.session_status?.[route.sessionID]
+                                    return s?.type === "busy" ? (s as any).label ?? "" : ""
+                                  })()}
+                                </Spinner>
+                              </box>
+                            </Show>
+                        </Match>
+                        <Match when={message.role === "assistant"}>
                         <AssistantMessage
                           last={lastAssistant()?.id === message.id}
                           message={message as AssistantMessage}
@@ -1542,7 +1560,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           customBorderChars={SplitBorder.customBorderChars}
           borderColor={theme.error}
         >
-          <text fg={theme.textMuted}>{props.message.error?.data.message}</text>
+          <text fg={theme.textMuted}>{String(props.message.error?.data.message ?? "")}</text>
         </box>
       </Show>
       <Switch>

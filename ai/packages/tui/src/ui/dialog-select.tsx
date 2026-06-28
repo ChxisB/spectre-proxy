@@ -50,6 +50,8 @@ export interface DialogSelectProps<T> {
   }[]
   bindings?: readonly Binding<Renderable, KeyEvent>[]
   current?: T
+  onBack?: () => void
+  backLabel?: string
 }
 
 export interface DialogSelectOption<T = any> {
@@ -295,6 +297,20 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     })
   }
 
+  useBindings(() => ({
+    enabled: !!props.onBack,
+    bindings: props.onBack
+      ? [
+          {
+            key: "backspace",
+            desc: "Go back",
+            group: "Dialog",
+            cmd: () => props.onBack?.(),
+          },
+        ]
+      : [],
+  }))
+
   useBindings(() => {
     const visible = shownActions()
 
@@ -487,11 +503,18 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     <box gap={1} paddingBottom={1} flexGrow={1}>
       <box paddingLeft={4} paddingRight={4}>
         <box flexDirection="row" justifyContent="space-between">
-          {props.titleView ?? (
-            <text fg={theme.text} attributes={TextAttributes.BOLD}>
-              {props.title}
-            </text>
-          )}
+          <box flexDirection="row" gap={1}>
+            <Show when={props.onBack}>
+              <text fg={theme.textMuted} onMouseUp={() => props.onBack?.()}>
+                {"\u2190"} {props.backLabel ?? "back"}
+              </text>
+            </Show>
+            {props.titleView ?? (
+              <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                {props.title}
+              </text>
+            )}
+          </box>
           <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
             esc
           </text>

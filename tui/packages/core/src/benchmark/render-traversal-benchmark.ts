@@ -227,9 +227,9 @@ function createScenarios(): ScenarioDefinition[] {
   return [
     {
       name: "layout_only_talon_wrappers",
-      description: "OpenCode-like nested layout boxes with no visible box output",
+      description: "Talon-like nested layout boxes with no visible box output",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(48, ctx.height + 12),
           includeVisibleBoxes: false,
           includeText: false,
@@ -249,9 +249,9 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "mixed_talon_wrappers",
-      description: "OpenCode-like layout tree with sparse visible panels and text leaves",
+      description: "Talon-like layout tree with sparse visible panels and text leaves",
       setup: async (ctx) => {
-        const state = await buildOpencodeLayoutTree(ctx, {
+        const state = await buildTalonLayoutTree(ctx, {
           messageCount: Math.max(40, ctx.height + 8),
           includeVisibleBoxes: true,
           includeText: true,
@@ -458,7 +458,7 @@ function createScenarios(): ScenarioDefinition[] {
   ]
 }
 
-async function buildOpencodeLayoutTree(ctx: BenchmarkContext, options: LayoutTreeOptions): Promise<LayoutTreeState> {
+async function buildTalonLayoutTree(ctx: BenchmarkContext, options: LayoutTreeOptions): Promise<LayoutTreeState> {
   clearRoot(ctx.renderer)
   resetBuffers(ctx.renderer)
 

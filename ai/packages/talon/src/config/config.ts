@@ -112,6 +112,19 @@ type Info = ConfigV1.Info & {
   // plugin_origins is derived state, not a persisted config field. It keeps each winning plugin spec together
   // with the file and scope it came from so later runtime code can make location-sensitive decisions.
   plugin_origins?: ConfigPlugin.Origin[]
+  team?: {
+    enabled?: boolean
+    max_parallel_members?: number
+    max_members?: number
+    tmux_visualization?: boolean
+    max_messages_per_run?: number
+    max_wall_clock_minutes?: number
+    max_member_turns?: number
+    base_dir?: string
+    message_payload_max_bytes?: number
+    recipient_unread_max_bytes?: number
+    mailbox_poll_interval_ms?: number
+  }
 }
 
 type State = {

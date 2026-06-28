@@ -13,7 +13,7 @@ export const NvidiaPlugin = PluginV2.define({
           evt.provider.update(item.provider.id, (provider) => {
             provider.request.headers["HTTP-Referer"] = "https://talon.ai/"
             provider.request.headers["X-Title"] = "talon"
-            provider.request.headers["X-BILLING-INVOKE-ORIGIN"] ??= "OpenCode"
+            provider.request.headers["X-BILLING-INVOKE-ORIGIN"] ??= "Talon"
           })
         }
       }),

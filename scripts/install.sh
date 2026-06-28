@@ -80,6 +80,12 @@ elif [ -n "$ZIG_CMD" ]; then
   LIB_SRC="$TALON_ROOT/tui/packages/core/src/zig/lib/aarch64-macos/libopentui.dylib"
   if [ -f "$LIB_SRC" ]; then
     cp "$LIB_SRC" "$TALON_HOME/bin/libopentui.dylib"
+    # Also update the workspace package used by the AI CLI build
+    CORE_DARWIN_PKG="$TALON_ROOT/tui/packages/core-darwin-arm64"
+    if [ -d "$CORE_DARWIN_PKG" ]; then
+      cp "$LIB_SRC" "$CORE_DARWIN_PKG/libopentui.dylib"
+      echo "  ✅ Updated core-darwin-arm64 dylib"
+    fi
     # Remove any stale dylib from the rebranding
     rm -f "$TALON_HOME/bin/libtalon.dylib"
     echo "  ✅ libopentui.dylib ($(du -h "$LIB_SRC" | cut -f1))"
@@ -132,7 +138,7 @@ else
     rm "$CORE_DARWIN_PKG"
     cp -R "$TALON_ROOT/tui/packages/core-darwin-arm64" "$CORE_DARWIN_PKG"
   fi
-  (cd "$TALON_ROOT/ai/packages/talon" && bun run build --single --skip-embed-web-ui 2>&1 | tail -5)
+  (cd "$TALON_ROOT/ai/packages/talon" && bun run build --single 2>&1 | tail -5)
   
   # Find the built binary (dist/talon-{os}-{arch}/bin/talon)
   BUILT_BINARY=$(find "$TALON_ROOT/ai/packages/talon/dist" -name "talon" -type f 2>/dev/null | head -1)
@@ -160,6 +166,10 @@ cat > "$TALON_HOME/bin/talon" << TALON_SCRIPT
 #!/usr/bin/env bash
 TALON_HOME="\$HOME/.talon"
 TALON_ROOT="$TALON_ROOT"
+
+# Point tree-sitter to the pre-built parser worker to avoid
+# bun Worker compilation failures that break markdown rendering.
+export OTUI_TREE_SITTER_WORKER_PATH="\$TALON_ROOT/tui/packages/core/dist/parser.worker.js"
 
 # Try the compiled binary first (fastest)
 if [ -f "\$TALON_HOME/bin/talon-ai" ]; then

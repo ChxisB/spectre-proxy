@@ -1,4 +1,4 @@
-export * as OpenCode from "./talon"
+export * as Talon from "./talon"
 
 import { Context, Effect, Layer } from "effect"
 import { Catalog } from "../catalog"
@@ -20,8 +20,8 @@ export interface Interface {
   readonly tools: Tool.Interface
 }
 
-/** Intentional public native API for Effect applications embedding OpenCode. */
-export class Service extends Context.Service<Service, Interface>()("@talon/public/OpenCode") {}
+/** Intentional public native API for Effect applications embedding Talon. */
+export class Service extends Context.Service<Service, Interface>()("@talon/public/Talon") {}
 
 class SessionModelValidation extends Context.Service<
   SessionModelValidation,
@@ -30,7 +30,7 @@ class SessionModelValidation extends Context.Service<
       input: Session.SwitchModelInput & { readonly location: Session.Info["location"] },
     ) => Effect.Effect<void, Session.ModelUnavailableError | Session.VariantUnavailableError>
   }
->()("@talon/public/OpenCode/SessionModelValidation") {}
+>()("@talon/public/Talon/SessionModelValidation") {}
 
 const ApplicationToolsLayer = ApplicationTools.layer
 const LocationServicesLayer = LocationServiceMap.layer.pipe(Layer.provide(ApplicationToolsLayer))
@@ -39,7 +39,7 @@ const SessionModelValidationLayer = Layer.effect(
   Effect.gen(function* () {
     const locations = yield* LocationServiceMap
     return SessionModelValidation.of({
-      validate: Effect.fn("OpenCode.sessions.validateModel")(function* (input) {
+      validate: Effect.fn("Talon.sessions.validateModel")(function* (input) {
         yield* Effect.gen(function* () {
           yield* (yield* PluginBoot.Service).wait()
           const catalog = yield* Catalog.Service
@@ -98,7 +98,7 @@ export const layer = Layer.effect(
           }),
         get: sessions.get,
         list: sessions.list,
-        switchModel: Effect.fn("OpenCode.sessions.switchModel")(function* (input) {
+        switchModel: Effect.fn("Talon.sessions.switchModel")(function* (input) {
           const session = yield* sessions.get(input.sessionID)
           yield* validation.validate({ ...input, location: session.location })
           yield* sessions.switchModel(input)
@@ -126,4 +126,4 @@ export const layer = Layer.effect(
   }),
 ).pipe(Layer.provide(Layer.merge(ApplicationToolsLayer, SessionsLayer)))
 
-// TODO: Add OpenCode.create(...) as the Promise facade over the same native API semantics.
+// TODO: Add Talon.create(...) as the Promise facade over the same native API semantics.

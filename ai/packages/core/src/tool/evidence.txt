@@ -1,0 +1,7 @@
+Record quality assurance evidence for completed work.
+- "save": Save evidence for the current session's work (scenarios, test results, surface artifacts)
+- "list": List recent evidence entries
+- "status": Show evidence gate status
+
+Evidence is stored at .talon/evidence/ and is checked before commits.
+Always record evidence after completing implementation work.

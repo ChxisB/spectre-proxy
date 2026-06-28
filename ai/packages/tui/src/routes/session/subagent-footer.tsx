@@ -6,7 +6,7 @@ import { SplitBorder } from "../../ui/border"
 import type { AssistantMessage } from "@talon-ai/sdk/v2"
 import { Locale } from "../../util/locale"
 import { useTerminalDimensions } from "@tui/solid"
-import { useCommandShortcut, useOpencodeKeymap } from "../../keymap"
+import { useCommandShortcut, useTalonKeymap } from "../../keymap"
 
 export function SubagentFooter() {
   const route = useRouteData("session")
@@ -40,22 +40,29 @@ export function SubagentFooter() {
     if (tokens <= 0) return
 
     const model = sync.data.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
-    const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
-    const cost = session()?.cost ?? 0
+      const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
+      const cost = session()?.cost ?? 0
 
-    const money = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    })
+      const money = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      })
 
-    return {
-      context: pct ? `${Locale.number(tokens)} (${pct})` : Locale.number(tokens),
-      cost: cost > 0 ? money.format(cost) : undefined,
-    }
+      let cacheSavings: number | undefined
+      if (model?.cost?.input && model?.cost?.cache?.read && last.tokens.cache.read > 0) {
+        cacheSavings = (last.tokens.cache.read * (model.cost.input - model.cost.cache.read)) / 1_000_000
+      }
+
+      return {
+        context: pct ? `${Locale.number(tokens)} (${pct})` : Locale.number(tokens),
+        cost: cost > 0 ? money.format(cost) : undefined,
+        savings: cacheSavings && cacheSavings > 0.001 ? money.format(cacheSavings) : undefined,
+        hasSavings: cacheSavings !== undefined && cacheSavings > 0.001,
+      }
   })
 
   const { theme } = useTheme()
-  const keymap = useOpencodeKeymap()
+  const keymap = useTalonKeymap()
   const parentShortcut = useCommandShortcut("session.parent")
   const previousShortcut = useCommandShortcut("session.child.previous")
   const nextShortcut = useCommandShortcut("session.child.next")
@@ -86,11 +93,15 @@ export function SubagentFooter() {
               </text>
             </Show>
             <Show when={usage()}>
-              {(item) => (
-                <text fg={theme.textMuted} wrapMode="none">
-                  {[item().context, item().cost].filter(Boolean).join(" · ")}
-                </text>
-              )}
+                {(item) => (
+                  <text fg={theme.textMuted} wrapMode="none">
+                    {[
+                      item().context,
+                      item().cost,
+                      item().hasSavings ? `saved ${item().savings}` : undefined,
+                    ].filter(Boolean).join(" · ")}
+                  </text>
+                )}
             </Show>
           </box>
           <box flexDirection="row" gap={2}>

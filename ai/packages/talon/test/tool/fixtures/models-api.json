@@ -28005,7 +28005,7 @@
     "env": ["TALON_API_KEY"],
     "npm": "@ai-sdk/openai-compatible",
     "api": "https://talon.ai/zen/go/v1",
-    "name": "OpenCode Go",
+    "name": "Talon Go",
     "doc": "https://talon.ai/docs/zen",
     "models": {
       "minimax-m2.7": {
@@ -57815,7 +57815,7 @@
     "env": ["TALON_API_KEY"],
     "npm": "@ai-sdk/openai-compatible",
     "api": "https://talon.ai/zen/v1",
-    "name": "OpenCode Zen",
+    "name": "Talon Zen",
     "doc": "https://talon.ai/docs/zen",
     "models": {
       "minimax-m2.7": {

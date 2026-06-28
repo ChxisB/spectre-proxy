@@ -1,4 +1,4 @@
-import { createOpencodeClient } from "@talon-ai/sdk/v2"
+import { createTalonClient } from "@talon-ai/sdk/v2"
 import { RGBA, type CliRenderer } from "@tui/core"
 import type { HostPluginApi } from "@talon-ai/tui/plugin/slots"
 import { createTuiResolvedConfig } from "./tui-runtime"
@@ -127,7 +127,7 @@ export function createTuiPluginApi(opts: Opts = {}): HostPluginApi {
   const kv: Record<string, unknown> = {}
   const count = opts.count
   const ctrl = new AbortController()
-  const own = createOpencodeClient({
+  const own = createTalonClient({
     baseUrl: "http://localhost:4096",
   })
   const fallback = () => own

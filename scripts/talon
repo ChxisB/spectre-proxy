@@ -2,6 +2,10 @@
 TALON_HOME="$HOME/.talon"
 TALON_ROOT="$HOME/development/projects/talon"
 
+# Point tree-sitter to the pre-built parser worker to avoid
+# bun Worker compilation failures that break markdown rendering.
+export OTUI_TREE_SITTER_WORKER_PATH="$TALON_ROOT/tui/packages/core/dist/parser.worker.js"
+
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
   echo "Talon — AI-powered development tool"
   echo ""

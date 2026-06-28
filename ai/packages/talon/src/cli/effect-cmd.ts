@@ -40,8 +40,8 @@ interface EffectCmdOpts<Args, A> {
    * commands like `run --attach <url>` where one flag flips between local
    * (needs instance) and remote (doesn't).
    *
-   * Use `false` for commands that don't read project state (e.g. `models`,
-   * `serve`, `web`, `account`, `db`, `upgrade`).
+ * Use `false` for commands that don't read project state (e.g. `models`,
+ * `serve`, `account`, `db`, `upgrade`).
    */
   instance?: boolean | ((args: Args) => boolean)
   /** Defaults to process.cwd(). Override for commands that take a directory positional. */

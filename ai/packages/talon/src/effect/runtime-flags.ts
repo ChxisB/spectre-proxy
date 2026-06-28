@@ -17,7 +17,6 @@ export class Service extends ConfigService.Service<Service>()("@talon/RuntimeFla
   autoShare: bool("TALON_AUTO_SHARE"),
   pure: bool("TALON_PURE"),
   disableDefaultPlugins: bool("TALON_DISABLE_DEFAULT_PLUGINS"),
-  disableEmbeddedWebUi: bool("TALON_DISABLE_EMBEDDED_WEB_UI"),
   disableExternalSkills: bool("TALON_DISABLE_EXTERNAL_SKILLS"),
   disableLspDownload: bool("TALON_DISABLE_LSP_DOWNLOAD"),
   disableClaudeCodePrompt: Config.all({

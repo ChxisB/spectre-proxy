@@ -12,8 +12,10 @@ import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
 import { NotFoundError } from "@/storage/storage"
 
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import * as DateTime from "effect/DateTime"
+import { WisdomExtractor } from "@talon-ai/core/wisdom/extractor"
+import { WisdomService } from "@talon-ai/core/wisdom/service"
 import { InstanceState } from "@/effect/instance-state"
 import { isOverflow as overflow, usable } from "./overflow"
 import { serviceUse } from "@talon-ai/core/effect/service-use"
@@ -546,9 +548,34 @@ export const layer = Layer.effect(
               recent,
             })
         }
-        yield* events.publish(Event.Compacted, { sessionID: input.sessionID })
-      }
-      return result
+          yield* events.publish(Event.Compacted, { sessionID: input.sessionID })
+
+          if (summary) {
+            const parsed = WisdomExtractor.parseCompactionSummaryText(summary)
+            const wisdomInputs = WisdomExtractor.extractFromCompactionSummary(parsed)
+            const maybeWisdom = yield* Effect.serviceOption(WisdomService.Service)
+            if (Option.isSome(maybeWisdom) && wisdomInputs.length > 0) {
+              const ws = maybeWisdom.value
+              yield* Effect.forEach(wisdomInputs, (entry) =>
+                ws.add({
+                  ...entry,
+                  sourceSessionID: input.sessionID,
+                }),
+              ).pipe(Effect.ignore)
+            }
+          }
+          }
+
+          yield* plugin.trigger("compaction.after", {
+          sessionID: input.sessionID,
+          result: result as "continue" | "stop" | "error",
+          messagesBefore: history.length,
+          messagesAfter: selected?.head?.length,
+        }, {}).pipe(
+          Effect.catch((error) => Effect.logWarning("compaction.after hook failed", { error })),
+        )
+
+        return result
     })
 
     const create = Effect.fn("SessionCompaction.create")(function* (input: {

@@ -602,6 +602,7 @@
         "ignore": "7.0.5",
         "immer": "11.1.4",
         "jsonc-parser": "3.3.1",
+        "marked": "catalog:",
         "mime-types": "3.0.2",
         "minimatch": "10.0.3",
         "npm-package-arg": "13.0.2",
@@ -645,6 +646,17 @@
         "typescript": "catalog:",
         "vscode-languageserver-types": "3.17.5",
         "why-is-node-running": "3.2.2",
+      },
+    },
+    "packages/team-core": {
+      "name": "@talon-ai/team-core",
+      "version": "1.17.8",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
       },
     },
     "packages/tui": {
@@ -725,18 +737,18 @@
     },
   },
   "trustedDependencies": [
-    "esbuild",
-    "tree-sitter-powershell",
-    "protobufjs",
     "web-tree-sitter",
+    "tree-sitter-powershell",
     "tree-sitter-bash",
+    "esbuild",
+    "protobufjs",
   ],
   "patchedDependencies": {
-    "@modelcontextprotocol/sdk@1.29.0": "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch",
-    "@ai-sdk/google@3.0.73": "patches/@ai-sdk%2Fgoogle@3.0.73.patch",
-    "@ai-sdk/xai@3.0.82": "patches/@ai-sdk%2Fxai@3.0.82.patch",
-    "@npmcli/agent@4.0.2": "patches/@npmcli%2Fagent@4.0.2.patch",
     "@silvia-odwyer/photon-node@0.3.4": "patches/@silvia-odwyer%2Fphoton-node@0.3.4.patch",
+    "@ai-sdk/xai@3.0.82": "patches/@ai-sdk%2Fxai@3.0.82.patch",
+    "@modelcontextprotocol/sdk@1.29.0": "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch",
+    "@npmcli/agent@4.0.2": "patches/@npmcli%2Fagent@4.0.2.patch",
+    "@ai-sdk/google@3.0.73": "patches/@ai-sdk%2Fgoogle@3.0.73.patch",
   },
   "overrides": {
     "@types/bun": "catalog:",
@@ -1934,6 +1946,8 @@
     "@talon-ai/sdk": ["@talon-ai/sdk@workspace:packages/sdk/js"],
 
     "@talon-ai/server": ["@talon-ai/server@workspace:packages/server"],
+
+    "@talon-ai/team-core": ["@talon-ai/team-core@workspace:packages/team-core"],
 
     "@talon-ai/tui": ["@talon-ai/tui@workspace:packages/tui"],
 

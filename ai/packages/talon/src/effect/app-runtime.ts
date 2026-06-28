@@ -16,6 +16,8 @@ import { ModelsDev } from "@talon-ai/core/models-dev"
 import { Provider } from "@/provider/provider"
 import { ProviderAuth } from "@/provider/auth"
 import { Agent } from "@/agent/agent"
+import { Workflow } from "@/agent/workflow"
+import { Context } from "@/context"
 import { Skill } from "@/skill"
 import { Discovery } from "@/skill/discovery"
 import { Question } from "@/question"
@@ -67,6 +69,7 @@ export const AppLayer = Layer.mergeAll(
   Provider.defaultLayer,
   ProviderAuth.defaultLayer,
   Agent.defaultLayer,
+  Workflow.defaultLayer,
   Skill.defaultLayer,
   Discovery.defaultLayer,
   Question.defaultLayer,
@@ -99,6 +102,7 @@ export const AppLayer = Layer.mergeAll(
   Installation.defaultLayer,
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
+  Context.defaultLayer,
 ).pipe(
   Layer.provideMerge(Ripgrep.defaultLayer),
   Layer.provideMerge(InstanceLayer.layer),

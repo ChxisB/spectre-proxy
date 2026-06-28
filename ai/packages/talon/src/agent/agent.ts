@@ -14,6 +14,14 @@ import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
+import PROMPT_ARCHITECT from "./prompt/architect.txt"
+import PROMPT_REVIEWER from "./prompt/reviewer.txt"
+import PROMPT_LIBRARIAN from "./prompt/librarian.txt"
+import PROMPT_PLANNER from "./prompt/planner.txt"
+import PROMPT_ORCHESTRATOR from "./prompt/orchestrator.txt"
+import PROMPT_GHOST from "./prompt/ghost.txt"
+import PROMPT_GHOST_GPT from "./prompt/ghost-gpt.txt"
+import PROMPT_PROMETHEUS from "./prompt/prometheus.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@talon-ai/core/global"
@@ -136,47 +144,6 @@ export const layer = Layer.effect(
         const user = Permission.fromConfig(cfg.permission ?? {})
 
         const agents: Record<string, Info> = {
-          build: {
-            name: "build",
-            description: "The default agent. Executes tools based on configured permissions.",
-            options: {},
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                question: "allow",
-                plan_enter: "allow",
-              }),
-              user,
-            ),
-            mode: "primary",
-            native: true,
-          },
-          plan: {
-            name: "plan",
-            description: "Plan mode. Disallows all edit tools.",
-            options: {},
-            permission: Permission.merge(
-              defaults,
-              Permission.fromConfig({
-                question: "allow",
-                plan_exit: "allow",
-                task: {
-                  general: "deny",
-                },
-                external_directory: {
-                  [path.join(Global.Path.data, "plans", "*")]: "allow",
-                },
-                edit: {
-                  "*": "deny",
-                  [path.join(".talon", "plans", "*.md")]: "allow",
-                  [path.relative(ctx.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]: "allow",
-                },
-              }),
-              user,
-            ),
-            mode: "primary",
-            native: true,
-          },
           general: {
             name: "general",
             description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
@@ -260,6 +227,186 @@ export const layer = Layer.effect(
             ),
             prompt: PROMPT_SUMMARY,
           },
+
+          // -- Discipline Agents (specialist roles for multi-agent orchestration) --
+
+          architect: {
+            name: "architect",
+            description: "Software architect consultant. Analyzes codebase structure and provides design guidance.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                bash: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                question: "allow",
+                // Can write design documents to the plans directory
+                edit: {
+                  "*": "deny",
+                  [path.join(".talon", "plans", "*.md")]: "allow",
+                },
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_ARCHITECT,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+
+          reviewer: {
+            name: "reviewer",
+            description: "Code review specialist. Reviews code for bugs, security issues, and quality problems.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                bash: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_REVIEWER,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+
+          librarian: {
+            name: "librarian",
+            description: "Codebase investigation specialist. Deep research into how code works across the project.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                bash: "allow",
+                read: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_LIBRARIAN,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+
+          planner: {
+            name: "planner",
+            description: "Strategic planning specialist. Breaks complex tasks into actionable, ordered steps.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                bash: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                question: "allow",
+                // Can write plans to the plans directory
+                edit: {
+                  "*": "deny",
+                  [path.join(".talon", "plans", "*.md")]: "allow",
+                },
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_PLANNER,
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+
+          orchestrator: {
+            name: "orchestrator",
+            hidden: true,
+            description:
+              "Multi-agent orchestrator. Decomposes complex tasks, delegates to specialist agents via the workflow tool, and synthesizes results.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                // Orchestrator needs all tools including workflow
+                workflow: "allow",
+                question: "allow",
+                plan_enter: "allow",
+              }),
+              user,
+            ),
+            prompt: PROMPT_ORCHESTRATOR,
+            options: {},
+            mode: "primary",
+            native: true,
+            color: "cyan",
+          },
+
+          ghost: {
+            name: "ghost",
+            description:
+              "The sole AI agent. Decomposes complex tasks, delegates to specialist subagents, and drives work to completion with verification.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                workflow: "allow",
+                question: "allow",
+              }),
+              user,
+            ),
+            prompt: PROMPT_GHOST,
+            options: {},
+            mode: "primary",
+            native: true,
+              color: "#c792ea",
+          },
+
+          prometheus: {
+            name: "prometheus",
+            description:
+              "Strategic planning consultant. Interviews, explores the codebase, and produces thorough adversarial plans before implementation begins.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+                read: "allow",
+                grep: "allow",
+                glob: "allow",
+                list: "allow",
+                bash: "allow",
+                webfetch: "allow",
+                websearch: "allow",
+                question: "allow",
+                edit: {
+                  "*": "deny",
+                  [path.join(".talon", "plans", "*.md")]: "allow",
+                },
+                external_directory: readonlyExternalDirectory,
+              }),
+              user,
+            ),
+            prompt: PROMPT_PROMETHEUS,
+            options: {},
+            mode: "subagent",
+            native: true,
+            color: "yellow",
+          },
         }
 
         for (const [key, value] of Object.entries(cfg.agent ?? {})) {
@@ -317,7 +464,7 @@ export const layer = Layer.effect(
             agents,
             values(),
             sortBy(
-              [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"],
+              [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "ghost"), "desc"],
               [(x) => x.name, "asc"],
             ),
           )

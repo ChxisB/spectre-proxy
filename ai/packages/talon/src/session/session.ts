@@ -39,6 +39,7 @@ import { SessionID, MessageID, PartID } from "./schema"
 
 import type { Provider } from "@/provider/provider"
 import { Permission } from "@/permission"
+import { Plugin } from "@/plugin"
 import { Global } from "@talon-ai/core/global"
 import { Effect, Layer, Option, Context, Schema, Types } from "effect"
 import { NonNegativeInt, optionalOmitUndefined } from "@talon-ai/core/schema"
@@ -661,9 +662,20 @@ export const layer: Layer.Layer<
           yield* remove(child.id)
         }
 
-        yield* events.publish(SessionV1.Event.Deleted, { sessionID, info: session })
-        yield* events.remove(sessionID)
-      } catch (error) {
+          yield* events.publish(SessionV1.Event.Deleted, { sessionID, info: session })
+
+          const pluginOption = yield* Effect.serviceOption(Plugin.Service)
+          if (Option.isSome(pluginOption)) {
+            yield* pluginOption.value.trigger("session.ended", {
+              sessionID,
+              reason: "deleted",
+            }, {}).pipe(
+              Effect.catch((error) => Effect.logWarning("session.ended hook failed", { error })),
+            )
+          }
+
+          yield* events.remove(sessionID)
+        } catch (error) {
         yield* Effect.logError("failed to remove session", { sessionID, error })
       }
     })
@@ -706,29 +718,43 @@ export const layer: Layer.Layer<
       } as SessionV1.Part
     })
 
-    const create = Effect.fn("Session.create")(function* (input?: {
-      parentID?: SessionID
-      title?: string
-      agent?: string
-      model?: Schema.Schema.Type<typeof Model>
-      metadata?: typeof Metadata.Type
-      permission?: PermissionV1.Ruleset
-      workspaceID?: WorkspaceV2.ID
-    }) {
-      const ctx = yield* InstanceState.context
-      const workspace = yield* InstanceState.workspaceID
-      return yield* createNext({
-        parentID: input?.parentID,
-        directory: ctx.directory,
-        path: sessionPath(ctx.worktree, ctx.directory),
-        title: input?.title,
-        agent: input?.agent,
-        model: input?.model,
-        metadata: input?.metadata,
-        permission: input?.permission,
-        workspaceID: input?.workspaceID ?? workspace,
+      const create = Effect.fn("Session.create")(function* (input?: {
+        parentID?: SessionID
+        title?: string
+        agent?: string
+        model?: Schema.Schema.Type<typeof Model>
+        metadata?: typeof Metadata.Type
+        permission?: PermissionV1.Ruleset
+        workspaceID?: WorkspaceV2.ID
+      }) {
+        const ctx = yield* InstanceState.context
+        const workspace = yield* InstanceState.workspaceID
+        const session = yield* createNext({
+          parentID: input?.parentID,
+          directory: ctx.directory,
+          path: sessionPath(ctx.worktree, ctx.directory),
+          title: input?.title,
+          agent: input?.agent,
+          model: input?.model,
+          metadata: input?.metadata,
+          permission: input?.permission,
+          workspaceID: input?.workspaceID ?? workspace,
+        })
+
+        const pluginOption = yield* Effect.serviceOption(Plugin.Service)
+        if (Option.isSome(pluginOption)) {
+          yield* pluginOption.value.trigger("session.created", {
+            sessionID: session.id,
+            agent: session.agent,
+            model: session.model ? { providerID: session.model.providerID, modelID: session.model.id } : undefined,
+            directory: session.directory,
+          }, {}).pipe(
+            Effect.catch((error) => Effect.logWarning("session.created hook failed", { error })),
+          )
+        }
+
+        return session
       })
-    })
 
     const fork = Effect.fn("Session.fork")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {
       const ctx = yield* InstanceState.context

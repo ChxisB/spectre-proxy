@@ -22,6 +22,7 @@ import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
+import { ConfigTeam } from "./config/team"
 import { ConfigV1 } from "./v1/config/config"
 import { ConfigMigrateV1 } from "./v1/config/migrate"
 
@@ -101,8 +102,17 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   plugins: ConfigPlugin.Plugins.pipe(Schema.optional).annotate({
     description: "Ordered external plugin packages to load",
   }),
-  experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
+    hashline_edit: Schema.optional(
+      Schema.Literals(["strict", "best-effort", "off"])
+    ).annotate({
+      description:
+        "Hashline edit verification mode. 'strict' rejects stale edits with error recovery. 'best-effort' warns but applies. 'off' skips hashline.",
+    }),
+    experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  team: ConfigTeam.Info.pipe(Schema.optional).annotate({
+    description: "Team mode configuration for multi-agent collaboration",
+  }),
 }) {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({

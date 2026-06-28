@@ -238,7 +238,7 @@ describe("SessionStatus.Info", () => {
         reason: "free_tier_limit",
         provider: "talon",
         title: "Free limit reached",
-        message: "Subscribe to OpenCode Go.",
+        message: "Subscribe to Talon Go.",
         label: "subscribe",
         link: "https://talon.ai/go",
       },

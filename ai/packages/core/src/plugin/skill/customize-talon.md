@@ -1,3 +1,12 @@
+---
+model: claude-sonnet-4-6
+allowed-tools:
+  - read
+  - write
+  - edit
+  - glob
+  - grep
+---
 <!--
   Built-in skill. Name and description are registered in code at
   packages/core/src/plugin/skill.ts

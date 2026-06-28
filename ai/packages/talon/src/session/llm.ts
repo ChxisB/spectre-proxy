@@ -17,6 +17,7 @@ import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { Permission } from "@/permission"
+import { Usage } from "@/provider/usage"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@talon-ai/core/event"
 import { Wildcard } from "@/util/wildcard"
@@ -70,6 +71,7 @@ const live: Layer.Layer<
   | EventV2Bridge.Service
   | LLMClientService
   | RuntimeFlags.Service
+  | Usage.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -81,6 +83,7 @@ const live: Layer.Layer<
     const events = yield* EventV2Bridge.Service
     const llmClient = yield* LLMClient.Service
     const flags = yield* RuntimeFlags.Service
+    const usage = yield* Usage.Service
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
       yield* Effect.logInfo("stream", {
@@ -111,6 +114,21 @@ const live: Layer.Layer<
         flags,
         isWorkflow,
       })
+
+      yield* plugin.trigger("provider.request.before", {
+        sessionID: input.sessionID,
+        providerID: input.model.providerID,
+        modelID: input.model.id,
+        request: {
+          system: prepared.system?.join("\n"),
+          messages: prepared.messages,
+          tools: prepared.tools,
+        },
+      }, {
+        options: prepared.params.options,
+      }).pipe(
+        Effect.catch((error) => Effect.logWarning("provider.request.before hook failed", { error })),
+      )
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via talon's tool system
@@ -375,6 +393,30 @@ const live: Layer.Layer<
             ).pipe(
               Stream.mapEffect((event) => LLMAISDK.toLLMEvents(state, event)),
               Stream.flatMap((events) => Stream.fromIterable(events)),
+              // Tap finish events to record token usage natively
+              Stream.tap((event) =>
+                Effect.sync(() => {
+                  if (event.type === "finish" && event.usage) {
+                    const u = event.usage
+                    const costModel = input.model.cost
+                    const inputCost = (u.inputTokens ?? 0) * (costModel?.input ?? 0)
+                    const outputCost = (u.outputTokens ?? 0) * (costModel?.output ?? 0)
+                    const cacheReadCost = (u.cacheReadInputTokens ?? 0) * (costModel?.cache?.read ?? 0)
+                    usage.record({
+                      sessionID: input.sessionID,
+                      providerID: input.model.providerID,
+                      modelID: input.model.id,
+                      inputTokens: u.inputTokens ?? 0,
+                      outputTokens: u.outputTokens ?? 0,
+                      cacheReadTokens: u.cacheReadInputTokens,
+                      cacheWriteTokens: u.cacheWriteInputTokens,
+                      reasoningTokens: u.reasoningTokens,
+                      cost: inputCost + outputCost + cacheReadCost,
+                      agent: input.agent.name,
+                    })
+                  }
+                }),
+              ),
             )
           }),
         ),
@@ -396,6 +438,7 @@ export const defaultLayer = Layer.suspend(() =>
       LLMClient.layer.pipe(Layer.provide(Layer.mergeAll(RequestExecutor.defaultLayer, WebSocketExecutor.layer))),
     ),
     Layer.provide(RuntimeFlags.defaultLayer),
+    Layer.provide(Usage.defaultLayer),
   ),
 )
 
@@ -410,6 +453,7 @@ export const node = LayerNode.make(layer, [
   EventV2Bridge.node,
   llmClient,
   RuntimeFlags.node,
+  Usage.node,
 ])
 
 export * as LLM from "./llm"

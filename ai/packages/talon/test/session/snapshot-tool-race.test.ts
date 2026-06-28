@@ -72,6 +72,10 @@ const lsp = Layer.succeed(
     prepareCallHierarchy: () => Effect.succeed([]),
     incomingCalls: () => Effect.succeed([]),
     outgoingCalls: () => Effect.succeed([]),
+    prepareRename: () => Effect.succeed(undefined),
+    rename: () => Effect.succeed({ edits: [], message: "" }),
+    markExtensionUnavailable: () => Effect.void,
+    resetUnavailableExtensions: () => Effect.void,
   }),
 )
 

@@ -81,7 +81,7 @@ type DrawBoxOptions = {
   bottomTitleAlignment?: "left" | "center" | "right"
 }
 
-type OpencodeScreenTree = {
+type TalonScreenTree = {
   root: BoxRenderable
   marker: BoxRenderable
   toast: BoxRenderable
@@ -334,7 +334,7 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "buffer_split_left_stack",
-      description: "OpenCode-like message stack with split left borders",
+      description: "Talon-like message stack with split left borders",
       kind: "direct-buffer",
       setup: (ctx) => {
         clearRoot(ctx.renderer)
@@ -356,7 +356,7 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "buffer_prompt_border_combo",
-      description: "OpenCode prompt border combo (left + bottom styles)",
+      description: "Talon prompt border combo (left + bottom styles)",
       kind: "direct-buffer",
       setup: (ctx) => {
         clearRoot(ctx.renderer)
@@ -378,7 +378,7 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "buffer_toast_split_left_right",
-      description: "OpenCode-like stacked toasts with split side borders",
+      description: "Talon-like stacked toasts with split side borders",
       kind: "direct-buffer",
       setup: (ctx) => {
         clearRoot(ctx.renderer)
@@ -452,10 +452,10 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "render_talon_screen_static",
-      description: "Headless render tree matching OpenCode box usage (static frame)",
+      description: "Headless render tree matching Talon box usage (static frame)",
       kind: "render-tree",
       setup: async (ctx) => {
-        const state = await buildOpencodeScreenTree(ctx)
+        const state = await buildTalonScreenTree(ctx)
         return {
           drawCallsPerIteration: state.drawCallsPerIteration,
           requestedCellsPerIteration: state.requestedCellsPerIteration,
@@ -470,10 +470,10 @@ function createScenarios(): ScenarioDefinition[] {
     },
     {
       name: "render_talon_screen_dynamic",
-      description: "Headless OpenCode-like tree with per-frame border/color updates",
+      description: "Headless Talon-like tree with per-frame border/color updates",
       kind: "render-tree",
       setup: async (ctx) => {
-        const state = await buildOpencodeScreenTree(ctx)
+        const state = await buildTalonScreenTree(ctx)
         const alignments = ["left", "center", "right"] as const
 
         return {
@@ -551,7 +551,7 @@ async function runScenario(
   }
 }
 
-async function buildOpencodeScreenTree(ctx: BenchmarkContext): Promise<OpencodeScreenTree> {
+async function buildTalonScreenTree(ctx: BenchmarkContext): Promise<TalonScreenTree> {
   clearRoot(ctx.renderer)
   resetBuffers(ctx.renderer)
 

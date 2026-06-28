@@ -12,6 +12,7 @@ import { Format } from "../format"
 import { FSUtil } from "@talon-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { trimDiff } from "./edit"
+import { checkForSlop, cleanBlankLines } from "@talon-ai/core/tool/comment-checker"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import * as Bom from "@/util/bom"
 
@@ -50,7 +51,11 @@ export const WriteTool = Tool.define(
           const contentOld = source.text
           const contentNew = next.text
 
-          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, contentNew))
+          // AI Slop Guard — strip boilerplate comments before writing
+          const slop = checkForSlop(contentNew)
+          const cleaned = slop.count > 0 ? cleanBlankLines(slop.cleaned) : contentNew
+
+          const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, cleaned))
           yield* ctx.ask({
             permission: "edit",
             patterns: [path.relative(instance.worktree, filepath)],
@@ -61,7 +66,7 @@ export const WriteTool = Tool.define(
             },
           })
 
-          yield* fs.writeWithDirs(filepath, Bom.join(contentNew, desiredBom))
+          yield* fs.writeWithDirs(filepath, Bom.join(cleaned, desiredBom))
           if (yield* format.file(filepath)) {
             yield* Bom.syncFile(fs, filepath, desiredBom)
           }
@@ -72,6 +77,9 @@ export const WriteTool = Tool.define(
           })
 
           let output = "Wrote file successfully."
+          if (slop.count > 0) {
+            output += `\n(AI Slop Guard removed ${slop.count} boilerplate comment${slop.count > 1 ? "s" : ""}: ${slop.matches.join(", ")})`
+          }
           yield* lsp.touchFile(filepath, "document")
           const diagnostics = yield* lsp.diagnostics()
           const normalizedFilepath = FSUtil.normalizePath(filepath)

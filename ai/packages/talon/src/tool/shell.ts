@@ -20,6 +20,8 @@ import { Plugin } from "@/plugin"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
+import { ShellFilter } from "./shell/filter"
+import { ShellCache } from "./shell/cache"
 import { BashArity } from "@/permission/arity"
 
 export { Parameters } from "./shell/prompt"
@@ -576,7 +578,11 @@ export const ShellTool = Tool.define(
       }
       if (aborted) meta.push("User aborted the command")
       const raw = list.map((item) => item.text).join("")
-      const end = tail(raw, limits.maxLines, limits.maxBytes)
+      // Apply output compression to reduce token consumption.
+      // Filters are transparent — the LLM gets cleaner, shorter output
+      // without needing to know about the compression layer.
+      const { text: compressed } = ShellFilter.filterOutput(raw, input.command)
+      const end = tail(compressed, limits.maxLines, limits.maxBytes)
       if (end.cut) cut = true
       if (!file && end.cut) {
         file = yield* trunc.write(raw)
@@ -626,6 +632,25 @@ export const ShellTool = Tool.define(
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
+
+              // Check command cache — skip parsing and spawning on hit
+              const key = ShellCache.cacheKey(params.command, cwd)
+              const cached = ShellCache.get(key)
+              if (cached) {
+                yield* Effect.logInfo("shell tool cache hit", { command: params.command })
+                return {
+                  title: params.description,
+                  metadata: {
+                    output: cached.output,
+                    exit: cached.exitCode,
+                    description: params.description,
+                    cached: true,
+                    truncated: false,
+                  },
+                  output: cached.output,
+                }
+              }
+
               const timeout = params.timeout ?? defaultTimeoutMs
               const ps = Shell.ps(shell)
               yield* Effect.scoped(
@@ -639,7 +664,7 @@ export const ShellTool = Tool.define(
                 }),
               )
 
-              return yield* run(
+              const result = yield* run(
                 {
                   shell,
                   command: params.command,
@@ -650,6 +675,11 @@ export const ShellTool = Tool.define(
                 },
                 ctx,
               )
+
+              // Store in cache for future identical calls
+              ShellCache.set(key, result.output, result.metadata.exit ?? null, result.metadata)
+
+              return result
             }),
         }
       })

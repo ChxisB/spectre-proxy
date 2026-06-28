@@ -12,7 +12,47 @@ cat > .git/hooks/pre-push << 'EOF'
 if command -v bun >/dev/null 2>&1; then
   bun install >/dev/null 2>&1 || true
 fi
+
+echo "🔍 Running pre-push checks..."
+
+# Typecheck
 bun run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ Typecheck failed. Fix errors before pushing."
+  exit 1
+fi
+echo "✅ Typecheck passed"
+
+# Evidence gate (warn-only by default)
+if [ -f ".talon/talon.json" ] || [ -f ".talon/talon.jsonc" ]; then
+  EVIDENCE_CONFIG=".talon/talon.jsonc"
+  [ -f ".talon/talon.json" ] && EVIDENCE_CONFIG=".talon/talon.json"
+
+  EVIDENCE_MODE=$(node -e "
+    try {
+      const c = require('fs').readFileSync('$EVIDENCE_CONFIG','utf-8');
+      const m = c.match(/\"evidence\"\\s*:\\s*\\{\\s*\"mode\"\\s*:\\s*\"(\\w+)\"/);
+      console.log(m ? m[1] : 'warn');
+    } catch(e) { console.log('warn'); }
+  " 2>/dev/null || echo "warn")
+
+  if [ "$EVIDENCE_MODE" = "block" ]; then
+    if [ ! -d ".talon/evidence" ] || [ -z "$(ls .talon/evidence/ 2>/dev/null)" ]; then
+      echo "❌ Evidence gate BLOCKED: No evidence found in .talon/evidence/"
+      echo "   Record evidence using the 'evidence' tool before committing."
+      exit 1
+    fi
+    echo "✅ Evidence verified"
+  else
+    if [ ! -d ".talon/evidence" ] || [ -z "$(ls .talon/evidence/ 2>/dev/null)" ]; then
+      echo "⚠️  Warning: No evidence found. Consider recording evidence with the 'evidence' tool."
+    else
+      echo "✅ Evidence present"
+    fi
+  fi
+fi
+
+echo "✅ All checks passed"
 EOF
 
 chmod +x .git/hooks/pre-push

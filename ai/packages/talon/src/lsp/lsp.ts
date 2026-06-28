@@ -116,6 +116,19 @@ interface State {
   servers: Record<string, LSPServer.Info>
   broken: Set<string>
   spawning: Map<string, Promise<LSPClient.Info | undefined>>
+  // Extensions known to have no available LSP server.
+  // Populated when diagnostics fail for an extension; reset on compaction.
+  unavailableExtensions: Set<string>
+}
+
+export type RenameFileEdit = {
+  readonly filePath: string
+  readonly edits: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>
+}
+
+export type RenameResult = {
+  readonly edits: RenameFileEdit[]
+  readonly message: string
 }
 
 export interface Interface {
@@ -133,6 +146,10 @@ export interface Interface {
   readonly prepareCallHierarchy: (input: LocInput) => Effect.Effect<any[]>
   readonly incomingCalls: (input: LocInput) => Effect.Effect<any[]>
   readonly outgoingCalls: (input: LocInput) => Effect.Effect<any[]>
+  readonly prepareRename: (input: LocInput) => Effect.Effect<any>
+  readonly rename: (input: LocInput & { newName: string }) => Effect.Effect<RenameResult>
+  readonly markExtensionUnavailable: (filePath: string) => Effect.Effect<void>
+  readonly resetUnavailableExtensions: () => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@talon/LSP") {}
@@ -195,6 +212,7 @@ export const layer = Layer.effect(
           servers,
           broken: new Set(),
           spawning: new Map(),
+          unavailableExtensions: new Set(),
         }
 
         yield* Effect.addFinalizer(() =>
@@ -332,6 +350,7 @@ export const layer = Layer.effect(
       const s = yield* InstanceState.get(state)
       return yield* Effect.promise(async () => {
         const extension = path.parse(file).ext || file
+        if (s.unavailableExtensions.has(extension)) return false
         for (const server of Object.values(s.servers)) {
           if (server.extensions.length && !server.extensions.includes(extension)) continue
           const root = await server.root(file, ctx)
@@ -479,6 +498,72 @@ export const layer = Layer.effect(
       return yield* callHierarchyRequest(input, "callHierarchy/outgoingCalls")
     })
 
+    const prepareRename = Effect.fn("LSP.prepareRename")(function* (input: LocInput) {
+      return yield* run(input.file, (client) =>
+        client.connection
+          .sendRequest<any | null>("textDocument/prepareRename", {
+            textDocument: { uri: pathToFileURL(input.file).href },
+            position: { line: input.line, character: input.character },
+          })
+          .catch(() => null),
+      )
+    })
+
+    const rename = Effect.fn("LSP.rename")(function* (input: LocInput & { newName: string }) {
+      const edits: RenameFileEdit[] = []
+      const lines: string[] = []
+
+      const results = yield* run(input.file, (client) =>
+        client.connection
+          .sendRequest<any>("textDocument/rename", {
+            textDocument: { uri: pathToFileURL(input.file).href },
+            position: { line: input.line, character: input.character },
+            newName: input.newName,
+          })
+          .catch(() => null),
+      )
+
+      for (const workspaceEdit of results) {
+        if (!workspaceEdit) continue
+
+        // Process documentChanges (preferred LSP format)
+        const docChanges: Array<{ textDocument: { uri: string }; edits: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }> }> =
+          workspaceEdit.documentChanges ?? []
+        for (const change of docChanges) {
+          const filePath = fileURLToPath(change.textDocument.uri)
+          edits.push({ filePath, edits: change.edits })
+          lines.push(`${path.basename(filePath)}: ${change.edits.length} change(s)`)
+        }
+
+        // Process changes (legacy format)
+        const changes: Record<string, Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>> =
+          workspaceEdit.changes ?? {}
+        for (const [uri, textEdits] of Object.entries(changes)) {
+          const filePath = fileURLToPath(uri)
+          edits.push({ filePath, edits: textEdits })
+          lines.push(`${path.basename(filePath)}: ${textEdits.length} change(s)`)
+        }
+      }
+
+      const message = edits.length === 0 ? "No files affected by rename." : lines.join("\n")
+      return { edits, message }
+    })
+
+    const markExtensionUnavailable = Effect.fn("LSP.markExtensionUnavailable")(function* (filePath: string) {
+      const s = yield* InstanceState.get(state)
+      const extension = path.parse(filePath).ext
+      if (extension) {
+        s.unavailableExtensions.add(extension)
+        yield* Effect.logDebug("marked extension as LSP-unavailable", { extension, file: filePath })
+      }
+    })
+
+    const resetUnavailableExtensions = Effect.fn("LSP.resetUnavailableExtensions")(function* () {
+      const s = yield* InstanceState.get(state)
+      s.unavailableExtensions.clear()
+      yield* Effect.logDebug("reset unavailable LSP extensions cache")
+    })
+
     return Service.of({
       init,
       status,
@@ -494,6 +579,10 @@ export const layer = Layer.effect(
       prepareCallHierarchy,
       incomingCalls,
       outgoingCalls,
+      prepareRename,
+      rename,
+      markExtensionUnavailable,
+      resetUnavailableExtensions,
     })
   }),
 )
